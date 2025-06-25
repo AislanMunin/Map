@@ -5,9 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mapa de Colaboradores com Leaflet.js</title>
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoCcT9Q5fI5wL4+w7g4u/B7bEw+kI+yF7+D7E+q0="
-        crossorigin=""/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
     <style>
         body {
@@ -66,9 +64,7 @@
         </ul>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-2007J0S+F8TzD90z+9aW7zN/B9+r9s/9s+A7g+P+1E0="
-        crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
         // Dados dos colaboradores
@@ -186,13 +182,10 @@
                     style: style,
                     onEachFeature: onEachFeature
                 }).addTo(map);
-                // Ajusta o mapa para mostrar o Brasil
-                // map.fitBounds(geojsonLayerBrasil.getBounds()); // Descomente se quiser focar apenas no Brasil ao carregar
             })
             .catch(error => console.error('Erro ao carregar o GeoJSON do Brasil:', error));
 
         // Carrega o GeoJSON do Paraguai (como país único)
-        // Usaremos um GeoJSON de países para isso.
         fetch('https://raw.githubusercontent.com/datasets/geo-countries/main/data/countries.geojson')
             .then(response => {
                 if (!response.ok) {
@@ -201,27 +194,30 @@
                 return response.json();
             })
             .then(data => {
-                // Filtra apenas o Paraguai
                 const paraguayFeature = data.features.find(feature => feature.properties.ISO_A2 === "PY");
                 if (paraguayFeature) {
                     geojsonLayerParaguai = L.geoJson(paraguayFeature, {
                         style: style,
-                        onEachFeature: onEachFeature // Usamos a mesma função onEachFeature
+                        onEachFeature: onEachFeature
                     }).addTo(map);
-                    // Ajusta o mapa para incluir o Paraguai também
-                    // map.fitBounds(geojsonLayerParaguai.getBounds()); // Descomente se quiser focar apenas no Paraguai
                 } else {
                     console.warn("Paraguai não encontrado no GeoJSON de países.");
                 }
-                 // Após carregar ambos, ajuste o mapa para a união dos limites
-                if (geojsonLayerBrasil && geojsonLayerParaguai) {
-                    const boundsBrasil = geojsonLayerBrasil.getBounds();
-                    const boundsParaguai = geojsonLayerParaguai.getBounds();
-                    map.fitBounds(boundsBrasil.extend(boundsParaguai));
-                } else if (geojsonLayerBrasil) {
-                     map.fitBounds(geojsonLayerBrasil.getBounds());
-                } else if (geojsonLayerParaguai) {
-                     map.fitBounds(geojsonLayerParaguai.getBounds());
+
+                // Ajusta o mapa para a união dos limites de ambos os GeoJSONs
+                let combinedBounds = null;
+                if (geojsonLayerBrasil) {
+                    combinedBounds = geojsonLayerBrasil.getBounds();
+                }
+                if (geojsonLayerParaguai) {
+                    if (combinedBounds) {
+                        combinedBounds.extend(geojsonLayerParaguai.getBounds());
+                    } else {
+                        combinedBounds = geojsonLayerParaguai.getBounds();
+                    }
+                }
+                if (combinedBounds) {
+                    map.fitBounds(combinedBounds);
                 }
             })
             .catch(error => console.error('Erro ao carregar o GeoJSON do Paraguai:', error));
@@ -245,6 +241,7 @@
                 collaboratorList.appendChild(listItem);
             }
         }
+        
 
         // Inicializa a caixa de informações
         displayCollaborators(null, 'Nenhum local selecionado.');
