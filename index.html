@@ -163,35 +163,23 @@
             return R * c; // Distance in kilometers
         }
 
-        // Collaborator Data (UPDATED: 'coords' should be CURRENT LOCATION, 'origin' can be anything for display)
-        // Ensure accurate coordinates for each collaborator's current location.
+        // Collaborator Data (UPDATED WITH REAL DATA AND COORDINATES)
+        // 'coords' should be the CURRENT CITY location of the collaborator.
+        // 'origin' is a display field for their natural origin or birthplace.
         const collaborators = {
-            "BR-SP": [
-                { name: "João Silva", origin: "São Paulo City", role: "Senior Developer", coords: [-23.5505, -46.6333] },
-                { name: "Maria Souza", origin: "Campinas", role: "Project Analyst", coords: [-22.9056, -47.0608] },
-                { name: "Aislan Munin", origin: "Salvador, Bahia", role: "Content Editor", coords: [-23.5505, -46.6333] } // Assuming Aislan's current location is São Paulo City
+            "BR-SP": [ // São Paulo
+                { name: "Aislan", origin: "São Bernardo do Campo", role: "Content Editor", coords: [-23.6892, -46.5645] } // São Paulo City coords for Aislan based on previous data
             ],
-            "BR-RJ": [ // Updated for Rio de Janeiro
-                { name: "Pedro Costa", origin: "Rio de Janeiro City", role: "Sales Manager", coords: [-22.9068, -43.1729] },
-                { name: "Ana Paula", origin: "Itaipava", role: "Marketing Specialist", coords: [-22.3833, -43.1500] } // Itaipava, Petrópolis
+            "BR-SC": [ // Santa Catarina
+                { name: "Lucas", origin: "São Paulo", role: "Backend Developer", coords: [-26.3045, -48.8475] } // Joinville
             ],
-            "BR-MG": [
-                { name: "Fernanda Alves", origin: "Belo Horizonte", role: "Human Resources", coords: [-19.9167, -43.9345] }
-            ],
-            "BR-RS": [ // New: Rio Grande do Sul
-                { name: "Carlos Antunes", origin: "Porto Alegre", role: "Operations Manager", coords: [-30.0346, -51.2177] },
-                { name: "Mariana Lima", origin: "Pelotas", role: "Financial Analyst", coords: [-31.7709, -52.3424] }
-            ],
-            "BR-SC": [ // New: Santa Catarina
-                { name: "Bruno Costa", origin: "Florianópolis", role: "Software Engineer", coords: [-27.5935, -48.5583] }
-            ],
-            "BR-PR": [ // New: Paraná (only Curitiba, as Joinville is in SC)
-                { name: "Julia Santos", origin: "Curitiba", role: "Data Scientist", coords: [-25.4284, -49.2733] } // Curitiba
-            ],
-            "PY": [
-                { name: "Ana Lopez", origin: "Asunción", role: "Marketing Specialist", coords: [-25.2637, -57.5759] },
-                { name: "Carlos Ramirez", origin: "Ciudad del Este", role: "Technical Support", coords: [-25.5056, -54.6146] },
-                { name: "Sofia Guedes", origin: "Luque", role: "Project Coordinator", coords: [-25.2667, -57.4917] }
+            "PY": [ // Paraguai (todas as cidades do Paraguai agrupadas sob PY)
+                { name: "Emilio", origin: "San Lorenzo", role: "Content Editor", coords: [-25.3333, -57.5] }, // Ciudad del Este
+                { name: "Alex", origin: "Asunción", role: "Content Editor", coords: [-25.3853, -57.5458] }, // Villa Elisa
+                { name: "Andrés", origin: "Asunción", role: "Backend Developer", coords: [-25.2667, -57.4917] }, // Luque
+                { name: "Juanjo", origin: "Asunción", role: "Quality Assurance", coords: [-25.2637, -57.5759] }, // Asunción
+                { name: "Lena", origin: "Asunción", role: "Content Editor", coords: [-25.3167, -57.3667] }, // Areguá
+                { name: "José", origin: "Ciudad del Este", role: "Content Editor", coords: [-25.5056, -54.6146] } // Ciudad del Este
             ]
         };
 
@@ -200,21 +188,6 @@
         const collaboratorList = document.getElementById('collaborator-list');
         const darkModeToggle = document.getElementById('dark-mode-toggle');
         const toggleCollaboratorPinsButton = document.getElementById('toggle-collaborator-pins');
-
-        // Dark Mode Logic (same as before)
-        const currentTheme = localStorage.getItem('theme');
-        if (currentTheme === 'dark') {
-            document.body.classList.add('dark-mode');
-        }
-
-        darkModeToggle.addEventListener('click', () => {
-            document.body.classList.toggle('dark-mode');
-            if (document.body.classList.contains('dark-mode')) {
-                localStorage.setItem('theme', 'dark');
-            } else {
-                localStorage.setItem('theme', 'light');
-            }
-        });
 
         // Initialize the map - MOVIDO PARA CIMA
         const map = L.map('map').setView([-20, -55], 4);
@@ -244,6 +217,21 @@
             })
         }).addTo(map)
           .bindPopup(`<strong>${RIBEIRAO_PRETO_NAME}</strong>`).openPopup(); // Open popup by default
+
+        // Dark Mode Logic (same as before)
+        const currentTheme = localStorage.getItem('theme');
+        if (currentTheme === 'dark') {
+            document.body.classList.add('dark-mode');
+        }
+
+        darkModeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            if (document.body.classList.contains('dark-mode')) {
+                localStorage.setItem('theme', 'dark');
+            } else {
+                localStorage.setItem('theme', 'light');
+            }
+        });
 
         // Default style for regions
         const defaultStyle = {
@@ -304,7 +292,7 @@
                             popupAnchor: [1, -34],
                             shadowSize: [41, 41]
                         })
-                    }).bindPopup(`<strong>${member.name}</strong><br>Current Location: ${member.origin}<br>Role: ${member.role}`);
+                    }).bindPopup(`<strong>${member.name}</strong><br>Location: ${member.coords[0]}, ${member.coords[1]}<br>Role: ${member.role}`); // Using coords in popup for precision
                     collaboratorMarkers.addLayer(marker);
 
                     // Add dotted line from collaborator to Ribeirão Preto
