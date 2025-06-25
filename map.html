@@ -33,7 +33,7 @@
         h1 {
             color: inherit;
         }
-        #dark-mode-toggle {
+        .toggle-button {
             padding: 10px 15px;
             border: none;
             border-radius: 5px;
@@ -42,9 +42,13 @@
             cursor: pointer;
             font-size: 1em;
             transition: background-color 0.3s;
+            margin-left: 10px; /* Space between buttons */
         }
-        #dark-mode-toggle:hover {
+        .toggle-button:hover {
             background-color: #1d3557;
+        }
+        #button-container {
+            display: flex;
         }
         #map-container {
             display: flex;
@@ -107,22 +111,16 @@
         body.dark-mode #info-box ul li strong {
             color: #a8dadc;
         }
-        .collaborator-name {
-            cursor: pointer;
-            font-weight: bold;
-            color: #007bff;
-            text-decoration: none;
-        }
-        .collaborator-name:hover {
-            text-decoration: underline;
-        }
     </style>
 </head>
 <body>
 
     <div id="map-header">
         <h1>Collaborator Map</h1>
-        <button id="dark-mode-toggle">Toggle Dark Mode</button>
+        <div id="button-container">
+            <button id="toggle-collaborator-pins" class="toggle-button">Toggle Collaborator Pins</button>
+            <button id="dark-mode-toggle" class="toggle-button">Toggle Dark Mode</button>
+        </div>
     </div>
 
     <div id="map-container">
@@ -145,7 +143,7 @@
         // Haversine formula to calculate distance between two points on Earth (in km)
         function haversineDistance(coords1, coords2) {
             if (!coords1 || coords1.length !== 2 || !coords2 || coords2.length !== 2) {
-                return NaN; // Return NaN if coordinates are invalid
+                return NaN;
             }
 
             const R = 6371; // Earth's radius in kilometers
@@ -165,31 +163,36 @@
             return R * c; // Distance in kilometers
         }
 
-        // Collaborator Data (UPDATED WITH MORE SPECIFIC CITY COORDINATES FOR PIN/LINE)
-        // IMPORTANT: These 'coords' should be for the specific city of origin, not the state centroid.
+        // Collaborator Data (UPDATED: 'coords' should be CURRENT LOCATION, 'origin' can be anything for display)
+        // Ensure accurate coordinates for each collaborator's current location.
         const collaborators = {
             "BR-SP": [
-                { name: "João Silva", origin: "São Paulo City", role: "Senior Developer", coords: [-23.5505, -46.6333] }, // São Paulo City
-                { name: "Maria Souza", origin: "Campinas", role: "Project Analyst", coords: [-22.9056, -47.0608] }, // Campinas City
-                { name: "Aislan Munin", origin: "Salvador, Bahia", role: "Content Editor", coords: [-12.9714, -38.5014] } // Salvador, Bahia
+                { name: "João Silva", origin: "São Paulo City", role: "Senior Developer", coords: [-23.5505, -46.6333] },
+                { name: "Maria Souza", origin: "Campinas", role: "Project Analyst", coords: [-22.9056, -47.0608] },
+                { name: "Aislan Munin", origin: "Salvador, Bahia", role: "Content Editor", coords: [-23.5505, -46.6333] } // Assuming Aislan's current location is São Paulo City
             ],
             "BR-RJ": [
-                { name: "Pedro Costa", origin: "Rio de Janeiro City", role: "Sales Manager", coords: [-22.9068, -43.1729] } // Rio de Janeiro City
+                { name: "Pedro Costa", origin: "Rio de Janeiro City", role: "Sales Manager", coords: [-22.9068, -43.1729] }
             ],
             "BR-MG": [
-                { name: "Fernanda Alves", origin: "Belo Horizonte", role: "Human Resources", coords: [-19.9167, -43.9345] } // Belo Horizonte, Minas Gerais
+                { name: "Fernanda Alves", origin: "Belo Horizonte", role: "Human Resources", coords: [-19.9167, -43.9345] }
             ],
             "PY": [
-                { name: "Ana Lopez", origin: "Asunción", role: "Marketing Specialist", coords: [-25.2637, -57.5759] }, // Asunción, Paraguay
-                { name: "Carlos Ramirez", origin: "Ciudad del Este", role: "Technical Support", coords: [-25.5056, -54.6146] }, // Ciudad del Este, Paraguay
-                { name: "Sofia Guedes", origin: "Luque", role: "Project Coordinator", coords: [-25.2667, -57.4917] } // Luque, Paraguay
+                { name: "Ana Lopez", origin: "Asunción", role: "Marketing Specialist", coords: [-25.2637, -57.5759] },
+                { name: "Carlos Ramirez", origin: "Ciudad del Este", role: "Technical Support", coords: [-25.5056, -54.6146] },
+                { name: "Sofia Guedes", origin: "Luque", role: "Project Coordinator", coords: [-25.2667, -57.4917] }
             ]
+            // You can add more collaborators here
         };
 
         const infoBox = document.getElementById('info-box');
         const locationNameSpan = document.getElementById('location-name');
         const collaboratorList = document.getElementById('collaborator-list');
         const darkModeToggle = document.getElementById('dark-mode-toggle');
+        const toggleCollaboratorPinsButton = document.getElementById('toggle-collaborator-pins');
+
+        let collaboratorMarkers = L.layerGroup().addTo(map); // Layer group for all collaborator pins
+        let collaboratorLines = L.layerGroup().addTo(map); // Layer group for all lines
 
         // Dark Mode Logic (same as before)
         const currentTheme = localStorage.getItem('theme');
@@ -216,8 +219,6 @@
 
         let geojsonLayerBrazil;
         let geojsonLayerParaguay;
-        let activeMarkers = []; // To store temporary markers (collaborator origin)
-        let activePolyline; // To store the temporary dotted line
 
         // Add Ribeirão Preto permanent pin
         const ribeiraoPretoMarker = L.marker(RIBEIRAO_PRETO_COORDS, {
@@ -230,8 +231,7 @@
                 shadowSize: [41, 41]
             })
         }).addTo(map)
-          .bindPopup(`<strong>${RIBEIRAO_PRETO_NAME}</strong>`)
-          .openPopup();
+          .bindPopup(`<strong>${RIBEIRAO_PRETO_NAME}</strong>`).openPopup(); // Open popup by default
 
         // Default style for regions
         const defaultStyle = {
@@ -243,7 +243,7 @@
             fillOpacity: 0.7
         };
 
-        // Highlight style for regions (on general hover, not collaborator hover)
+        // Highlight style for regions (on general hover)
         const hoverStyle = {
             weight: 3,
             color: '#666',
@@ -275,15 +275,55 @@
             }
         }
 
-        // Function to clear temporary markers and lines
-        function clearTemporaryMapElements() {
-            activeMarkers.forEach(marker => map.removeLayer(marker));
-            activeMarkers = [];
-            if (activePolyline) {
-                map.removeLayer(activePolyline);
-                activePolyline = null;
-            }
+        // Function to add all collaborator pins and lines
+        function addCollaboratorPinsAndLines() {
+            collaboratorMarkers.clearLayers(); // Clear existing pins
+            collaboratorLines.clearLayers(); // Clear existing lines
+
+            Object.values(collaborators).flat().forEach(member => {
+                if (member.coords && member.coords.length === 2) {
+                    const marker = L.marker(member.coords, {
+                        icon: L.icon({
+                            iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+                            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                            iconSize: [25, 41],
+                            iconAnchor: [12, 41],
+                            popupAnchor: [1, -34],
+                            shadowSize: [41, 41]
+                        })
+                    }).bindPopup(`<strong>${member.name}</strong><br>Current Location: ${member.origin}`);
+                    collaboratorMarkers.addLayer(marker);
+
+                    // Add dotted line from collaborator to Ribeirão Preto
+                    const line = L.polyline([member.coords, RIBEIRAO_PRETO_COORDS], {
+                        color: 'blue', // Or any color you prefer
+                        weight: 2,
+                        opacity: 0.6,
+                        dashArray: '5, 5' // Dotted line
+                    });
+                    collaboratorLines.addLayer(line);
+                }
+            });
         }
+
+        // Function to remove all collaborator pins and lines
+        function removeCollaboratorPinsAndLines() {
+            collaboratorMarkers.clearLayers();
+            collaboratorLines.clearLayers();
+        }
+
+        // Toggle button functionality
+        let pinsActive = false; // Initial state: pins are off
+        toggleCollaboratorPinsButton.addEventListener('click', () => {
+            pinsActive = !pinsActive;
+            if (pinsActive) {
+                addCollaboratorPinsAndLines();
+                toggleCollaboratorPinsButton.textContent = "Hide Collaborator Pins";
+            } else {
+                removeCollaboratorPinsAndLines();
+                toggleCollaboratorPinsButton.textContent = "Show Collaborator Pins";
+            }
+        });
 
         // Function on region click
         function onEachFeature(feature, layer) {
@@ -311,7 +351,7 @@
             });
         }
 
-        // Load Brazil states GeoJSON - CURRENTLY WORKING LINK
+        // Load Brazil states GeoJSON
         fetch('https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson')
             .then(response => {
                 if (!response.ok) {
@@ -371,7 +411,8 @@
         function displayCollaborators(regionId, regionName) {
             locationNameSpan.textContent = regionName;
             collaboratorList.innerHTML = ''; // Clear previous list
-            clearTemporaryMapElements(); // Clear any existing pins/lines
+
+            // No need to clear temporary elements here, as they are controlled by the toggle button
 
             const teamMembers = collaborators[regionId];
 
@@ -384,52 +425,15 @@
                     }
 
                     const listItem = document.createElement('li');
+                    // Removed collaborator-name class as hover effect is no longer needed for pins
                     listItem.innerHTML = `
-                        <strong>Name:</strong> <a href="#" class="collaborator-name" data-member-coords="${member.coords}">${member.name}</a><br>
+                        <strong>Name:</strong> ${member.name}<br>
                         <strong>Origin:</strong> ${member.origin}<br>
                         <strong>Role:</strong> ${member.role}<br>
                         <strong>Distance to Ribeirão Preto:</strong> ${distance}
                     `;
                     collaboratorList.appendChild(listItem);
                 });
-
-                // Add hover event listeners to collaborator names AFTER they are added to the DOM
-                const collaboratorNameLinks = document.querySelectorAll('.collaborator-name');
-                collaboratorNameLinks.forEach(link => {
-                    link.addEventListener('mouseover', function(e) {
-                        e.preventDefault(); // Prevent default link behavior
-                        clearTemporaryMapElements(); // Clear previous temporary elements
-
-                        const memberCoords = this.dataset.memberCoords ? this.dataset.memberCoords.split(',').map(Number) : null;
-
-                        if (memberCoords) {
-                            // Add marker for collaborator's origin
-                            const originMarker = L.marker(memberCoords, {
-                                icon: L.icon({
-                                    iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-                                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                                    iconSize: [25, 41],
-                                    iconAnchor: [12, 41],
-                                    popupAnchor: [1, -34],
-                                    shadowSize: [41, 41]
-                                })
-                            }).addTo(map)
-                              .bindPopup(`<strong>${member.name}</strong><br>${member.origin}`);
-                            activeMarkers.push(originMarker);
-
-                            // Add dotted line between collaborator origin and Ribeirão Preto
-                            activePolyline = L.polyline([memberCoords, RIBEIRAO_PRETO_COORDS], {
-                                color: 'red',
-                                weight: 3,
-                                opacity: 0.7,
-                                dashArray: '5, 10' // Dotted line
-                            }).addTo(map);
-                        }
-                    });
-
-                    link.addEventListener('mouseout', clearTemporaryMapElements);
-                });
-
             } else {
                 const listItem = document.createElement('li');
                 listItem.textContent = 'No collaborators found for this region.';
