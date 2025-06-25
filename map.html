@@ -185,12 +185,8 @@
             "BR-SC": [ // New: Santa Catarina
                 { name: "Bruno Costa", origin: "Florianópolis", role: "Software Engineer", coords: [-27.5935, -48.5583] }
             ],
-            "BR-PR": [ // New: Paraná (only Joinville, as it's in SC, moving Curitiba/Londrina from previous example if they were there)
+            "BR-PR": [ // New: Paraná (only Curitiba, as Joinville is in SC)
                 { name: "Julia Santos", origin: "Curitiba", role: "Data Scientist", coords: [-25.4284, -49.2733] } // Curitiba
-                // Note: Joinville is in Santa Catarina (BR-SC), not Paraná (BR-PR). 
-                // I've added a Curitiba entry for Paraná instead.
-                // If you explicitly meant Joinville to be under "Paraná" for some reason, 
-                // please clarify, but geographically it belongs to Santa Catarina.
             ],
             "PY": [
                 { name: "Ana Lopez", origin: "Asunción", role: "Marketing Specialist", coords: [-25.2637, -57.5759] },
@@ -204,20 +200,6 @@
         const collaboratorList = document.getElementById('collaborator-list');
         const darkModeToggle = document.getElementById('dark-mode-toggle');
         const toggleCollaboratorPinsButton = document.getElementById('toggle-collaborator-pins');
-
-        // Initialize the map
-        const map = L.map('map').setView([-20, -55], 4); // Adjusted view to be more central for Southern Brazil
-
-        // Add a tile provider (base map)
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
-
-        let geojsonLayerBrazil;
-        let geojsonLayerParaguay;
-
-        let collaboratorMarkers = L.layerGroup().addTo(map); // Layer group for all collaborator pins
-        let collaboratorLines = L.layerGroup().addTo(map); // Layer group for all lines
 
         // Dark Mode Logic (same as before)
         const currentTheme = localStorage.getItem('theme');
@@ -233,6 +215,22 @@
                 localStorage.setItem('theme', 'light');
             }
         });
+
+        // Initialize the map - MOVIDO PARA CIMA
+        const map = L.map('map').setView([-20, -55], 4);
+
+        // Add a tile provider (base map)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // AGORA SIM, DECLARE E INICIALIZE OS LAYERGROUPS
+        let collaboratorMarkers = L.layerGroup().addTo(map);
+        let collaboratorLines = L.layerGroup().addTo(map);
+
+
+        let geojsonLayerBrazil;
+        let geojsonLayerParaguay;
 
         // Add Ribeirão Preto permanent pin
         const ribeiraoPretoMarker = L.marker(RIBEIRAO_PRETO_COORDS, {
@@ -295,31 +293,29 @@
             collaboratorLines.clearLayers(); // Clear existing lines
 
             // Iterate over all state/country categories in the collaborators object
-            Object.keys(collaborators).forEach(regionKey => {
-                collaborators[regionKey].forEach(member => {
-                    if (member.coords && member.coords.length === 2) {
-                        const marker = L.marker(member.coords, {
-                            icon: L.icon({
-                                iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-                                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                                iconSize: [25, 41],
-                                iconAnchor: [12, 41],
-                                popupAnchor: [1, -34],
-                                shadowSize: [41, 41]
-                            })
-                        }).bindPopup(`<strong>${member.name}</strong><br>Current Location: ${member.origin}<br>Role: ${member.role}`);
-                        collaboratorMarkers.addLayer(marker);
+            Object.values(collaborators).flat().forEach(member => {
+                if (member.coords && member.coords.length === 2) {
+                    const marker = L.marker(member.coords, {
+                        icon: L.icon({
+                            iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+                            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                            iconSize: [25, 41],
+                            iconAnchor: [12, 41],
+                            popupAnchor: [1, -34],
+                            shadowSize: [41, 41]
+                        })
+                    }).bindPopup(`<strong>${member.name}</strong><br>Current Location: ${member.origin}<br>Role: ${member.role}`);
+                    collaboratorMarkers.addLayer(marker);
 
-                        // Add dotted line from collaborator to Ribeirão Preto
-                        const line = L.polyline([member.coords, RIBEIRAO_PRETO_COORDS], {
-                            color: 'blue',
-                            weight: 2,
-                            opacity: 0.6,
-                            dashArray: '5, 5'
-                        });
-                        collaboratorLines.addLayer(line);
-                    }
-                });
+                    // Add dotted line from collaborator to Ribeirão Preto
+                    const line = L.polyline([member.coords, RIBEIRAO_PRETO_COORDS], {
+                        color: 'blue',
+                        weight: 2,
+                        opacity: 0.6,
+                        dashArray: '5, 5'
+                    });
+                    collaboratorLines.addLayer(line);
+                }
             });
         }
 
