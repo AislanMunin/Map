@@ -140,8 +140,7 @@
     <script>
         // Ribeirão Preto coordinates (Latitude, Longitude)
         const RIBEIRAO_PRETO_COORDS = [-21.1764, -47.8188];
-        // São Paulo (State) ID for highlighting
-        const SAO_PAULO_STATE_ID = "BR-SP";
+        const RIBEIRAO_PRETO_NAME = "Ribeirão Preto";
 
         // Haversine formula to calculate distance between two points on Earth (in km)
         function haversineDistance(coords1, coords2) {
@@ -166,25 +165,24 @@
             return R * c; // Distance in kilometers
         }
 
-        // Collaborator Data (Updated with approximate coordinates for origins)
-        // IMPORTANT: Ensure 'origin' matches the 'name' property of Brazilian states GeoJSON
-        // and 'Paraguay' for the country. Add 'coords' for distance calculation.
+        // Collaborator Data (UPDATED WITH MORE SPECIFIC CITY COORDINATES FOR PIN/LINE)
+        // IMPORTANT: These 'coords' should be for the specific city of origin, not the state centroid.
         const collaborators = {
             "BR-SP": [
-                { name: "João Silva", origin: "São Paulo", role: "Senior Developer", coords: [-23.5505, -46.6333] }, // São Paulo City
+                { name: "João Silva", origin: "São Paulo City", role: "Senior Developer", coords: [-23.5505, -46.6333] }, // São Paulo City
                 { name: "Maria Souza", origin: "Campinas", role: "Project Analyst", coords: [-22.9056, -47.0608] }, // Campinas City
-                { name: "Aislan Munin", origin: "Bahia", role: "Content Editor", coords: [-12.9667, -38.5000] } // Approximate Salvador, Bahia
+                { name: "Aislan Munin", origin: "Salvador, Bahia", role: "Content Editor", coords: [-12.9714, -38.5014] } // Salvador, Bahia
             ],
             "BR-RJ": [
-                { name: "Pedro Costa", origin: "Rio de Janeiro", role: "Sales Manager", coords: [-22.9068, -43.1729] } // Rio de Janeiro City
+                { name: "Pedro Costa", origin: "Rio de Janeiro City", role: "Sales Manager", coords: [-22.9068, -43.1729] } // Rio de Janeiro City
             ],
             "BR-MG": [
-                { name: "Fernanda Alves", origin: "Minas Gerais", role: "Human Resources", coords: [-19.9167, -43.9345] } // Belo Horizonte, Minas Gerais
+                { name: "Fernanda Alves", origin: "Belo Horizonte", role: "Human Resources", coords: [-19.9167, -43.9345] } // Belo Horizonte, Minas Gerais
             ],
             "PY": [
-                { name: "Ana Lopez", origin: "Paraguay", role: "Marketing Specialist", coords: [-25.2637, -57.5759] }, // Asunción, Paraguay
-                { name: "Carlos Ramirez", origin: "Paraguay", role: "Technical Support", coords: [-25.5056, -54.6146] }, // Ciudad del Este, Paraguay
-                { name: "Sofia Guedes", origin: "Paraguay", role: "Project Coordinator", coords: [-25.2667, -57.4917] } // Luque, Paraguay
+                { name: "Ana Lopez", origin: "Asunción", role: "Marketing Specialist", coords: [-25.2637, -57.5759] }, // Asunción, Paraguay
+                { name: "Carlos Ramirez", origin: "Ciudad del Este", role: "Technical Support", coords: [-25.5056, -54.6146] }, // Ciudad del Este, Paraguay
+                { name: "Sofia Guedes", origin: "Luque", role: "Project Coordinator", coords: [-25.2667, -57.4917] } // Luque, Paraguay
             ]
         };
 
@@ -218,7 +216,22 @@
 
         let geojsonLayerBrazil;
         let geojsonLayerParaguay;
-        let highlightedLayers = []; // Array to store currently highlighted layers
+        let activeMarkers = []; // To store temporary markers (collaborator origin)
+        let activePolyline; // To store the temporary dotted line
+
+        // Add Ribeirão Preto permanent pin
+        const ribeiraoPretoMarker = L.marker(RIBEIRAO_PRETO_COORDS, {
+            icon: L.icon({
+                iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+            })
+        }).addTo(map)
+          .bindPopup(`<strong>${RIBEIRAO_PRETO_NAME}</strong>`)
+          .openPopup();
 
         // Default style for regions
         const defaultStyle = {
@@ -230,29 +243,13 @@
             fillOpacity: 0.7
         };
 
-        // Highlight style for regions
+        // Highlight style for regions (on general hover, not collaborator hover)
         const hoverStyle = {
             weight: 3,
             color: '#666',
             dashArray: '',
             fillOpacity: 0.9,
             fillColor: '#1d3557'
-        };
-
-        // Origin highlight style (red border, specific fill)
-        const originHighlightStyle = {
-            weight: 4,
-            color: '#ff0000', // Red border
-            fillOpacity: 0.9,
-            fillColor: '#ffd700' // Gold fill for origin
-        };
-
-        // Current location (São Paulo) highlight style (blue border, specific fill)
-        const currentLocationHighlightStyle = {
-            weight: 4,
-            color: '#0000ff', // Blue border
-            fillOpacity: 0.9,
-            fillColor: '#87CEEB' // SkyBlue fill for current location
         };
 
         // Function to style regions
@@ -269,7 +266,7 @@
             }
         }
 
-        // Function to reset style for regions
+        // Function to reset style for regions (on general mouseout)
         function resetHighlight(e) {
             if (geojsonLayerBrazil && geojsonLayerBrazil.hasLayer(e.target)) {
                 geojsonLayerBrazil.resetStyle(e.target);
@@ -278,34 +275,14 @@
             }
         }
 
-        // Function to highlight a specific GeoJSON feature by property and apply a style
-        function highlightGeoJSONFeature(layerGroup, property, value, highlightStyle) {
-            if (!layerGroup) return;
-
-            layerGroup.eachLayer(function (featureLayer) {
-                // Brazil states have 'name' and 'sigla'
-                if (layerGroup === geojsonLayerBrazil && (featureLayer.feature.properties.name === value || featureLayer.feature.properties.sigla === value.replace('BR-', ''))) {
-                    featureLayer.setStyle(highlightStyle);
-                    highlightedLayers.push(featureLayer);
-                }
-                // Countries GeoJSON has 'name' and 'ISO_A2'
-                else if (layerGroup === geojsonLayerParaguay && (featureLayer.feature.properties.name === value || featureLayer.feature.properties.ISO_A2 === value)) {
-                    featureLayer.setStyle(highlightStyle);
-                    highlightedLayers.push(featureLayer);
-                }
-            });
-        }
-
-        // Function to reset all currently highlighted GeoJSON features
-        function resetAllHighlights() {
-            highlightedLayers.forEach(layer => {
-                if (geojsonLayerBrazil && geojsonLayerBrazil.hasLayer(layer)) {
-                    geojsonLayerBrazil.resetStyle(layer);
-                } else if (geojsonLayerParaguay && geojsonLayerParaguay.hasLayer(layer)) {
-                    geojsonLayerParaguay.resetStyle(layer);
-                }
-            });
-            highlightedLayers = [];
+        // Function to clear temporary markers and lines
+        function clearTemporaryMapElements() {
+            activeMarkers.forEach(marker => map.removeLayer(marker));
+            activeMarkers = [];
+            if (activePolyline) {
+                map.removeLayer(activePolyline);
+                activePolyline = null;
+            }
         }
 
         // Function on region click
@@ -381,7 +358,7 @@
                     if (combinedBounds) {
                         combinedBounds.extend(geojsonLayerParaguay.getBounds());
                     } else {
-                        combinedBounds = geojsonLayerParaguai.getBounds();
+                        combinedBounds = geojsonLayerParaguay.getBounds();
                     }
                 }
                 if (combinedBounds) {
@@ -394,7 +371,7 @@
         function displayCollaborators(regionId, regionName) {
             locationNameSpan.textContent = regionName;
             collaboratorList.innerHTML = ''; // Clear previous list
-            resetAllHighlights(); // Reset any previous highlights
+            clearTemporaryMapElements(); // Clear any existing pins/lines
 
             const teamMembers = collaborators[regionId];
 
@@ -408,7 +385,7 @@
 
                     const listItem = document.createElement('li');
                     listItem.innerHTML = `
-                        <strong>Name:</strong> <a href="#" class="collaborator-name" data-origin="${member.origin}" data-member-coords="${member.coords}">${member.name}</a><br>
+                        <strong>Name:</strong> <a href="#" class="collaborator-name" data-member-coords="${member.coords}">${member.name}</a><br>
                         <strong>Origin:</strong> ${member.origin}<br>
                         <strong>Role:</strong> ${member.role}<br>
                         <strong>Distance to Ribeirão Preto:</strong> ${distance}
@@ -421,31 +398,36 @@
                 collaboratorNameLinks.forEach(link => {
                     link.addEventListener('mouseover', function(e) {
                         e.preventDefault(); // Prevent default link behavior
-                        const origin = this.dataset.origin;
+                        clearTemporaryMapElements(); // Clear previous temporary elements
+
                         const memberCoords = this.dataset.memberCoords ? this.dataset.memberCoords.split(',').map(Number) : null;
 
-                        resetAllHighlights(); // Clear all highlights first
+                        if (memberCoords) {
+                            // Add marker for collaborator's origin
+                            const originMarker = L.marker(memberCoords, {
+                                icon: L.icon({
+                                    iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+                                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                                    iconSize: [25, 41],
+                                    iconAnchor: [12, 41],
+                                    popupAnchor: [1, -34],
+                                    shadowSize: [41, 41]
+                                })
+                            }).addTo(map)
+                              .bindPopup(`<strong>${member.name}</strong><br>${member.origin}`);
+                            activeMarkers.push(originMarker);
 
-                        // Highlight Origin
-                        if (origin === "Paraguay") {
-                            highlightGeoJSONFeature(geojsonLayerParaguay, 'name', 'Paraguay', originHighlightStyle);
-                        } else {
-                            highlightGeoJSONFeature(geojsonLayerBrazil, 'name', origin, originHighlightStyle);
+                            // Add dotted line between collaborator origin and Ribeirão Preto
+                            activePolyline = L.polyline([memberCoords, RIBEIRAO_PRETO_COORDS], {
+                                color: 'red',
+                                weight: 3,
+                                opacity: 0.7,
+                                dashArray: '5, 10' // Dotted line
+                            }).addTo(map);
                         }
-
-                        // Highlight São Paulo (Current Location)
-                        highlightGeoJSONFeature(geojsonLayerBrazil, 'sigla', 'SP', currentLocationHighlightStyle);
-
-
-                        // Optional: Add a temporary marker for the specific collaborator's origin city
-                        // This requires the 'coords' in collaborators to be the city's coordinates, not the state's.
-                        // if (memberCoords) {
-                        //     const marker = L.marker(memberCoords).addTo(map);
-                        //     highlightedLayers.push(marker); // Add marker to highlighted list to remove later
-                        // }
                     });
 
-                    link.addEventListener('mouseout', resetAllHighlights);
+                    link.addEventListener('mouseout', clearTemporaryMapElements);
                 });
 
             } else {
