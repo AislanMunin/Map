@@ -146,10 +146,10 @@
             let regionName;
 
             // Lógica para obter ID e nome da região
-            // Para o GeoJSON do Brasil (luizricardo/geojson-brasil)
-            if (feature.properties.sigla && feature.properties.nome) { 
+            // Para o GeoJSON do Brasil (codeforamerica/click_that_hood)
+            if (feature.properties.sigla && feature.properties.name) { 
                 regionId = "BR-" + feature.properties.sigla; // Ex: BR-SP
-                regionName = feature.properties.nome; // Ex: São Paulo
+                regionName = feature.properties.name; // Ex: São Paulo
             } 
             // Para o GeoJSON de países (Paraguai)
             else if (feature.properties.ISO_A2 === "PY" || feature.properties.name === "Paraguay") {
@@ -171,7 +171,7 @@
         }
 
         // Carrega o GeoJSON dos estados do Brasil - NOVO LINK
-        fetch('https://raw.githubusercontent.com/luizricardo/geojson-brasil/master/estados.json')
+        fetch('https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson')
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
