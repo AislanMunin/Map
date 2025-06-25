@@ -83,7 +83,7 @@
                 { nome: "Ana Lopez", origem: "Asunción", cargo: "Especialista em Marketing" },
                 { nome: "Carlos Ramirez", origem: "Ciudad del Este", cargo: "Suporte Técnico" },
                 { nome: "Sofia Guedes", origem: "Luque", cargo: "Coordenadora de Projetos" }
-            ],
+            ]
             // Adicione mais dados para cada estado brasileiro ou para o Paraguai
             // Exemplo para um novo estado: "BR-PR": [ { nome: "Novo Colaborador", origem: "Curitiba", cargo: "Desenvolvedor Júnior" } ]
         };
@@ -93,7 +93,6 @@
         const collaboratorList = document.getElementById('collaborator-list');
 
         // Inicializa o mapa
-        // Centrando mais na América do Sul e com zoom adequado
         const map = L.map('map').setView([-17, -50], 4); 
 
         // Adiciona um provedor de tiles (mapa base)
@@ -147,21 +146,10 @@
             let regionName;
 
             // Lógica para obter ID e nome da região
-            // Para o GeoJSON do IBGE (Brasil)
-            if (feature.properties.id) { // ID do estado, ex: 35 para SP
-                const idUf = feature.properties.id;
-                // Mapear ID do IBGE para SIGLA_UF (se necessário, para bater com seus dados)
-                // Exemplo simplificado, você pode precisar de um mapa mais completo
-                const ufMap = {
-                    11: 'BR-RO', 12: 'BR-AC', 13: 'BR-AM', 14: 'BR-RR', 15: 'BR-PA',
-                    16: 'BR-AP', 17: 'BR-TO', 21: 'BR-MA', 22: 'BR-PI', 23: 'BR-CE',
-                    24: 'BR-RN', 25: 'BR-PB', 26: 'BR-PE', 27: 'BR-AL', 28: 'BR-SE',
-                    29: 'BR-BA', 31: 'BR-MG', 32: 'BR-ES', 33: 'BR-RJ', 35: 'BR-SP',
-                    41: 'BR-PR', 42: 'BR-SC', 43: 'BR-RS', 50: 'BR-MS', 51: 'BR-MT',
-                    52: 'BR-GO', 53: 'BR-DF'
-                };
-                regionId = ufMap[idUf] || 'BR-UF' + idUf; // Usar o ID mapeado ou um genérico
-                regionName = feature.properties.nome; // Nome do estado
+            // Para o GeoJSON do Brasil (luizricardo/geojson-brasil)
+            if (feature.properties.sigla && feature.properties.nome) { 
+                regionId = "BR-" + feature.properties.sigla; // Ex: BR-SP
+                regionName = feature.properties.nome; // Ex: São Paulo
             } 
             // Para o GeoJSON de países (Paraguai)
             else if (feature.properties.ISO_A2 === "PY" || feature.properties.name === "Paraguay") {
@@ -183,7 +171,7 @@
         }
 
         // Carrega o GeoJSON dos estados do Brasil - NOVO LINK
-        fetch('https://raw.githubusercontent.com/ibge/Admin-Boundary/master/BR_UF.json')
+        fetch('https://raw.githubusercontent.com/luizricardo/geojson-brasil/master/estados.json')
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -198,7 +186,7 @@
             })
             .catch(error => console.error('Erro ao carregar o GeoJSON do Brasil:', error));
 
-        // Carrega o GeoJSON de Países (para o Paraguai) - LINK ATUALIZADO/CONFIRMADO
+        // Carrega o GeoJSON de Países (para o Paraguai)
         fetch('https://raw.githubusercontent.com/datasets/geo-countries/main/data/countries.geojson')
             .then(response => {
                 if (!response.ok) {
@@ -207,7 +195,6 @@
                 return response.json();
             })
             .then(data => {
-                // Procurar Paraguai por ISO_A2 ou nome
                 const paraguayFeature = data.features.find(feature => 
                     feature.properties.ISO_A2 === "PY" || feature.properties.name === "Paraguay"
                 );
