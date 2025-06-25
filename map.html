@@ -14,24 +14,24 @@
             flex-direction: column;
             align-items: center;
             margin: 20px;
-            background-color: #f4f4f4; /* Light mode default */
-            color: #333; /* Light mode default text */
+            background-color: #f4f4f4;
+            color: #333;
             transition: background-color 0.3s, color 0.3s;
         }
         body.dark-mode {
-            background-color: #1a1a2e; /* Dark mode */
-            color: #e0e0e0; /* Dark mode text */
+            background-color: #1a1a2e;
+            color: #e0e0e0;
         }
         #map-header {
-            width: 80%;
-            max-width: 1000px;
+            width: 90%;
+            max-width: 1200px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
         }
         h1 {
-            color: inherit; /* Inherit color for dark mode */
+            color: inherit;
         }
         #dark-mode-toggle {
             padding: 10px 15px;
@@ -46,13 +46,17 @@
         #dark-mode-toggle:hover {
             background-color: #1d3557;
         }
+        #map-container {
+            display: flex;
+            width: 90%;
+            max-width: 1200px;
+            margin-bottom: 20px;
+        }
         #map {
             height: 600px;
-            width: 80%;
-            max-width: 1000px;
+            width: 65%; /* Adjust as needed */
             border: 1px solid #ccc;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
             background-color: #fff;
         }
         body.dark-mode #map {
@@ -60,13 +64,15 @@
             box-shadow: 0 0 15px rgba(0,0,0,0.5);
         }
         #info-box {
-            width: 80%;
-            max-width: 1000px;
+            width: 35%; /* Adjust as needed */
             background-color: #fff;
             border: 1px solid #ccc;
             box-shadow: 0 0 8px rgba(0,0,0,0.1);
             padding: 15px;
             box-sizing: border-box;
+            margin-left: 20px;
+            height: 600px; /* Match map height */
+            overflow-y: auto; /* Enable scrolling for long lists */
             transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s;
         }
         body.dark-mode #info-box {
@@ -89,21 +95,26 @@
             border-radius: 4px;
             border-left: 3px solid #457b9d;
             transition: background-color 0.3s, border-color 0.3s;
-            line-height: 1.4; /* Improves readability */
+            line-height: 1.4;
         }
         body.dark-mode #info-box ul li {
             background-color: #3b3b6b;
-            border-left-color: #7a9d45; /* Dark mode accent color */
+            border-left-color: #7a9d45;
         }
         #info-box ul li strong {
-            color: #1d3557; /* Light mode accent for labels */
+            color: #1d3557;
         }
         body.dark-mode #info-box ul li strong {
-            color: #a8dadc; /* Dark mode accent for labels */
+            color: #a8dadc;
         }
-        /* Leaflet map styles for features */
-        .leaflet-pane .leaflet-marker-pane img { /* Adjust marker icon for better visibility if needed */
-            filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.5));
+        .collaborator-name {
+            cursor: pointer;
+            font-weight: bold;
+            color: #007bff; /* Link color */
+            text-decoration: none;
+        }
+        .collaborator-name:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -114,13 +125,14 @@
         <button id="dark-mode-toggle">Toggle Dark Mode</button>
     </div>
 
-    <div id="map"></div>
-
-    <div id="info-box">
-        <h3>Collaborators in <span id="location-name"></span></h3>
-        <ul id="collaborator-list">
-            <li>No location selected.</li>
-        </ul>
+    <div id="map-container">
+        <div id="map"></div>
+        <div id="info-box">
+            <h3>Collaborators in <span id="location-name"></span></h3>
+            <ul id="collaborator-list">
+                <li>No location selected.</li>
+            </ul>
+        </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -128,20 +140,25 @@
     <script>
         // Ribeirão Preto coordinates (Latitude, Longitude)
         const RIBEIRAO_PRETO_COORDS = [-21.1764, -47.8188];
+        const SAO_PAULO_CITY_COORDS = [-23.5505, -46.6333]; // Approximate coordinates for São Paulo
 
         // Haversine formula to calculate distance between two points on Earth (in km)
         function haversineDistance(coords1, coords2) {
             const R = 6371; // Earth's radius in kilometers
-            const lat1 = coords1[0] * Math.PI / 180;
-            const lon1 = coords1[1] * Math.PI / 180;
-            const lat2 = coords2[0] * Math.PI / 180;
-            const lon2 = coords2[1] * Math.PI / 180;
+            const lat1 = coords1 && coords1.length === 2 ? coords1 : [0, 0];
+            const lon1 = coords1 && coords1.length === 2 ? coords1 : [0, 0];
+            const lat2 = coords2 && coords2.length === 2 ? coords2 : [0, 0];
+            const lon2 = coords2 && coords2.length === 2 ? coords2 : [0, 0];
 
-            const dLat = lat2 - lat1;
-            const dLon = lon2 - lon1;
+            const dLat = (lat2 && lat1) ? (lat2 * Math.PI / 180) - (lat1 * Math.PI / 180) : 0;
+            const dLon = (lon2 && lon1) ? (lon2 * Math.PI / 180) - (lon1 * Math.PI / 180) : 0;
+            const la1 = (lat1 && lat1.length === 2) ? lat1 : [0, 0];
+            const lo1 = (lon1 && lon1.length === 2) ? lon1 : [0, 0];
+            const la2 = (lat2 && lat2.length === 2) ? lat2 : [0, 0];
+            const lo2 = (lon2 && lon2.length === 2) ? lon2 : [0, 0];
 
             const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                      Math.cos(lat1) * Math.cos(lat2) *
+                      Math.cos((la1 && la1.length === 2 ? la1 : [0,0])[0] * Math.PI / 180) * Math.cos((la2 && la2.length === 2 ? la2 : [0,0])[0] * Math.PI / 180) *
                       Math.sin(dLon / 2) * Math.sin(dLon / 2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
@@ -149,33 +166,32 @@
         }
 
         // Collaborator Data (Updated with approximate coordinates for regions/states)
-        // IMPORTANT: The coordinates below are approximate centroids for calculation.
-        // For actual precise distances, you might need more specific data or a geocoding service.
         const collaborators = {
-            "BR-SP": [ 
-                { name: "João Silva", origin: "São Paulo", role: "Senior Developer", coords: [-23.5505, -46.6333] }, // São Paulo City
-                { name: "Maria Souza", origin: "Campinas", role: "Project Analyst", coords: [-22.9056, -47.0608] } // Campinas City
+            "BR-SP": [
+                { name: "João Silva", origin: "São Paulo", role: "Senior Developer", coords: [-23.5505, -46.6333] },
+                { name: "Maria Souza", origin: "Campinas", role: "Project Analyst", coords: [-22.9056, -47.0608] }
             ],
-            "BR-RJ": [ 
-                { name: "Pedro Costa", origin: "Rio de Janeiro", role: "Sales Manager", coords: [-22.9068, -43.1729] } // Rio de Janeiro City
+            "BR-RJ": [
+                { name: "Pedro Costa", origin: "Rio de Janeiro", role: "Sales Manager", coords: [-22.9068, -43.1729] }
             ],
-            "BR-MG": [ 
-                { name: "Fernanda Alves", origin: "Belo Horizonte", role: "Human Resources", coords: [-19.9167, -43.9345] } // Belo Horizonte City
+            "BR-MG": [
+                { name: "Fernanda Alves", origin: "Belo Horizonte", role: "Human Resources", coords: [-19.9167, -43.9345] }
             ],
-            "PY": [ // Paraguay as a single region (using Asunción's approximate coordinates for distance)
+            "PY": [
                 { name: "Ana Lopez", origin: "Asunción", role: "Marketing Specialist", coords: [-25.2637, -57.5759] },
                 { name: "Carlos Ramirez", origin: "Ciudad del Este", role: "Technical Support", coords: [-25.5056, -54.6146] },
                 { name: "Sofia Guedes", origin: "Luque", role: "Project Coordinator", coords: [-25.2667, -57.4917] }
             ]
-            // Add more data for each Brazilian state or for Paraguay
+            // Add more data with 'coords' for each origin
         };
 
         const infoBox = document.getElementById('info-box');
         const locationNameSpan = document.getElementById('location-name');
         const collaboratorList = document.getElementById('collaborator-list');
         const darkModeToggle = document.getElementById('dark-mode-toggle');
+        const mapElement = document.getElementById('map');
 
-        // Dark Mode Logic
+        // Dark Mode Logic (same as before)
         const currentTheme = localStorage.getItem('theme');
         if (currentTheme === 'dark') {
             document.body.classList.add('dark-mode');
@@ -191,29 +207,30 @@
         });
 
         // Initialize the map
-        const map = L.map('map').setView([-17, -50], 4); 
+        const map = L.map('map').setView([-17, -50], 4);
 
         // Add a tile provider (base map)
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        let geojsonLayerBrazil; 
-        let geojsonLayerParaguay; 
+        let geojsonLayerBrazil;
+        let geojsonLayerParaguay;
+        let highlightedLayers = []; // Array to store currently highlighted layers
 
         // Function to style regions
         function style(feature) {
             return {
-                fillColor: '#a8dadc', 
+                fillColor: '#a8dadc',
                 weight: 1,
                 opacity: 1,
-                color: '#457b9d', 
+                color: '#457b9d',
                 dashArray: '3',
                 fillOpacity: 0.7
             };
         }
 
-        // Function to style on hover
+        // Function to style on hover for regions
         function highlightFeature(e) {
             const layer = e.target;
             layer.setStyle({
@@ -221,7 +238,7 @@
                 color: '#666',
                 dashArray: '',
                 fillOpacity: 0.9,
-                fillColor: '#1d3557' 
+                fillColor: '#1d3557'
             });
 
             if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
@@ -229,13 +246,41 @@
             }
         }
 
-        // Function to reset style
+        // Function to reset style for regions
         function resetHighlight(e) {
             if (geojsonLayerBrazil && geojsonLayerBrazil.hasLayer(e.target)) {
                 geojsonLayerBrazil.resetStyle(e.target);
             } else if (geojsonLayerParaguay && geojsonLayerParaguay.hasLayer(e.target)) {
                 geojsonLayerParaguay.resetStyle(e.target);
             }
+        }
+
+        // Function to highlight a specific GeoJSON feature by property
+        function highlightGeoJSONFeature(layer, property, value) {
+            if (layer) {
+                layer.eachLayer(function (featureLayer) {
+                    if (featureLayer.feature.properties.sigla === value || featureLayer.feature.properties.name === value || featureLayer.feature.properties.ISO_A2 === value) {
+                        featureLayer.setStyle({
+                            weight: 4,
+                            color: '#ff0000', // Highlight color
+                            fillOpacity: 0.9
+                        });
+                        highlightedLayers.push(featureLayer);
+                    }
+                });
+            }
+        }
+
+        // Function to reset highlighted GeoJSON features
+        function resetHighlightedFeatures() {
+            highlightedLayers.forEach(layer => {
+                if (geojsonLayerBrazil && geojsonLayerBrazil.hasLayer(layer)) {
+                    geojsonLayerBrazil.resetStyle(layer);
+                } else if (geojsonLayerParaguay && geojsonLayerParaguay.hasLayer(layer)) {
+                    geojsonLayerParaguay.resetStyle(layer);
+                }
+            });
+            highlightedLayers = [];
         }
 
         // Function on region click
@@ -245,10 +290,10 @@
 
             // Logic to get region ID and name
             // For Brazil GeoJSON (codeforamerica/click_that_hood)
-            if (feature.properties.sigla && feature.properties.name) { 
-                regionId = "BR-" + feature.properties.sigla; 
-                regionName = feature.properties.name; 
-            } 
+            if (feature.properties.sigla && feature.properties.name) {
+                regionId = "BR-" + feature.properties.sigla;
+                regionName = feature.properties.name;
+            }
             // For Countries GeoJSON (Paraguay)
             else if (feature.properties.ISO_A2 === "PY" || feature.properties.name === "Paraguay") {
                 regionId = "PY";
@@ -293,10 +338,10 @@
                 return response.json();
             })
             .then(data => {
-                const paraguayFeature = data.features.find(feature => 
+                const paraguayFeature = data.features.find(feature =>
                     feature.properties.ISO_A2 === "PY" || feature.properties.name === "Paraguay"
                 );
-                
+
                 if (paraguayFeature) {
                     geojsonLayerParaguay = L.geoJson(paraguayFeature, {
                         style: style,
@@ -313,9 +358,9 @@
                 }
                 if (geojsonLayerParaguay) {
                     if (combinedBounds) {
-                        combinedBounds.extend(geojsonLayerParaguai.getBounds());
+                        combinedBounds.extend(geojsonLayerParaguay.getBounds());
                     } else {
-                        combinedBounds = geojsonLayerParaguai.getBounds();
+                        combinedBounds = geojsonLayerParaguay.getBounds();
                     }
                 }
                 if (combinedBounds) {
@@ -328,11 +373,13 @@
         function displayCollaborators(regionId, regionName) {
             locationNameSpan.textContent = regionName;
             collaboratorList.innerHTML = ''; // Clear previous list
+            resetHighlightedFeatures(); // Reset any previous highlights
 
-            const teamMembers = collaborators[regionId];
+            const teamMembers = collaborators.hasOwnProperty(regionId) ? collaborators_with_coords : (collaborators_with_coords["PY"] ? { "PY": collaborators_with_coords["PY"] } : {});
+            const currentRegionMembers = teamMembers.hasOwnProperty(regionId) ? teamMembers?.[regionId] : [];
 
-            if (teamMembers && teamMembers.length > 0) {
-                teamMembers.forEach(member => {
+            if (currentRegionMembers && currentRegionMembers.length > 0) {
+                currentRegionMembers.forEach(member => {
                     // Calculate distance if coordinates are available
                     let distance = 'N/A';
                     if (member.coords && member.coords.length === 2) {
@@ -342,19 +389,55 @@
 
                     const listItem = document.createElement('li');
                     listItem.innerHTML = `
-                        <strong>Name:</strong> ${member.name}<br>
+                        <strong>Name:</strong> <a href="#" class="collaborator-name" data-origin="${member.origin}">${member.name}</a><br>
                         <strong>Origin:</strong> ${member.origin}<br>
                         <strong>Role:</strong> ${member.role}<br>
                         <strong>Distance to Ribeirão Preto:</strong> ${distance}
                     `;
                     collaboratorList.appendChild(listItem);
                 });
+
+                // Add hover event listeners to collaborator names AFTER they are added to the DOM
+                const collaboratorNameLinks = document.querySelectorAll('.collaborator-name');
+                collaboratorNameLinks.forEach(link => {
+                    link.addEventListener('mouseover', function(e) {
+                        const origin = this.dataset.origin;
+                        resetHighlightedFeatures();
+                        highlightGeoJSONFeature(geojsonLayerBrazil, 'name', origin);
+                        highlightGeoJSONFeature(geojsonLayerParaguay, 'name', origin);
+                        highlightGeoJSONFeature(geojsonLayerBrazil, 'sigla', origin.split('-')[1]); // Try highlighting by SIGLA
+                        highlightGeoJSONFeature(geojsonLayerBrazil, 'name', 'São Paulo'); // Highlight São Paulo (current location)
+                        highlightGeoJSONFeature(geojsonLayerBrazil, 'sigla', 'SP'); // Highlight São Paulo by SIGLA
+                    });
+                    link.addEventListener('mouseout', resetHighlightedFeatures);
+                });
+
             } else {
                 const listItem = document.createElement('li');
                 listItem.textContent = 'No collaborators found for this region.';
                 collaboratorList.appendChild(listItem);
             }
         }
+
+        // Updated collaborator data with coordinates
+        const collaborators_with_coords = {
+            "BR-SP": [
+                { name: "João Silva", origin: "São Paulo", role: "Senior Developer", coords: [-23.5505, -46.6333] },
+                { name: "Maria Souza", origin: "Campinas", role: "Project Analyst", coords: [-22.9056, -47.0608] },
+                { name: "Aislan Munin", origin: "Bahia", role: "Content Editor", coords: [-12.9667, -38.5000] } // Approximate Bahia coordinates
+            ],
+            "BR-RJ": [
+                { name: "Pedro Costa", origin: "Rio de Janeiro", role: "Sales Manager", coords: [-22.9068, -43.1729] }
+            ],
+            "BR-MG": [
+                { name: "Fernanda Alves", origin: "Belo Horizonte", role: "Human Resources", coords: [-19.9167, -43.9345] }
+            ],
+            "PY": [
+                { name: "Ana Lopez", origin: "Asunción", role: "Marketing Specialist", coords: [-25.2637, -57.5759] },
+                { name: "Carlos Ramirez", origin: "Ciudad del Este", role: "Technical Support", coords: [-25.5056, -54.6146] },
+                { name: "Sofia Guedes", origin: "Luque", role: "Project Coordinator", coords: [-25.2667, -57.4917] }
+            ]
+        };
 
         // Initialize info box
         displayCollaborators(null, 'No location selected.');
