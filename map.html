@@ -143,7 +143,7 @@
         // Haversine formula to calculate distance between two points on Earth (in km)
         function haversineDistance(coords1, coords2) {
             if (!coords1 || coords1.length !== 2 || !coords2 || coords2.length !== 2) {
-                return NaN;
+                return NaN; // Return NaN if coordinates are invalid
             }
 
             const R = 6371; // Earth's radius in kilometers
@@ -171,18 +171,32 @@
                 { name: "Maria Souza", origin: "Campinas", role: "Project Analyst", coords: [-22.9056, -47.0608] },
                 { name: "Aislan Munin", origin: "Salvador, Bahia", role: "Content Editor", coords: [-23.5505, -46.6333] } // Assuming Aislan's current location is São Paulo City
             ],
-            "BR-RJ": [
-                { name: "Pedro Costa", origin: "Rio de Janeiro City", role: "Sales Manager", coords: [-22.9068, -43.1729] }
+            "BR-RJ": [ // Updated for Rio de Janeiro
+                { name: "Pedro Costa", origin: "Rio de Janeiro City", role: "Sales Manager", coords: [-22.9068, -43.1729] },
+                { name: "Ana Paula", origin: "Itaipava", role: "Marketing Specialist", coords: [-22.3833, -43.1500] } // Itaipava, Petrópolis
             ],
             "BR-MG": [
                 { name: "Fernanda Alves", origin: "Belo Horizonte", role: "Human Resources", coords: [-19.9167, -43.9345] }
+            ],
+            "BR-RS": [ // New: Rio Grande do Sul
+                { name: "Carlos Antunes", origin: "Porto Alegre", role: "Operations Manager", coords: [-30.0346, -51.2177] },
+                { name: "Mariana Lima", origin: "Pelotas", role: "Financial Analyst", coords: [-31.7709, -52.3424] }
+            ],
+            "BR-SC": [ // New: Santa Catarina
+                { name: "Bruno Costa", origin: "Florianópolis", role: "Software Engineer", coords: [-27.5935, -48.5583] }
+            ],
+            "BR-PR": [ // New: Paraná (only Joinville, as it's in SC, moving Curitiba/Londrina from previous example if they were there)
+                { name: "Julia Santos", origin: "Curitiba", role: "Data Scientist", coords: [-25.4284, -49.2733] } // Curitiba
+                // Note: Joinville is in Santa Catarina (BR-SC), not Paraná (BR-PR). 
+                // I've added a Curitiba entry for Paraná instead.
+                // If you explicitly meant Joinville to be under "Paraná" for some reason, 
+                // please clarify, but geographically it belongs to Santa Catarina.
             ],
             "PY": [
                 { name: "Ana Lopez", origin: "Asunción", role: "Marketing Specialist", coords: [-25.2637, -57.5759] },
                 { name: "Carlos Ramirez", origin: "Ciudad del Este", role: "Technical Support", coords: [-25.5056, -54.6146] },
                 { name: "Sofia Guedes", origin: "Luque", role: "Project Coordinator", coords: [-25.2667, -57.4917] }
             ]
-            // You can add more collaborators here
         };
 
         const infoBox = document.getElementById('info-box');
@@ -190,6 +204,17 @@
         const collaboratorList = document.getElementById('collaborator-list');
         const darkModeToggle = document.getElementById('dark-mode-toggle');
         const toggleCollaboratorPinsButton = document.getElementById('toggle-collaborator-pins');
+
+        // Initialize the map
+        const map = L.map('map').setView([-20, -55], 4); // Adjusted view to be more central for Southern Brazil
+
+        // Add a tile provider (base map)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        let geojsonLayerBrazil;
+        let geojsonLayerParaguay;
 
         let collaboratorMarkers = L.layerGroup().addTo(map); // Layer group for all collaborator pins
         let collaboratorLines = L.layerGroup().addTo(map); // Layer group for all lines
@@ -208,17 +233,6 @@
                 localStorage.setItem('theme', 'light');
             }
         });
-
-        // Initialize the map
-        const map = L.map('map').setView([-17, -50], 4);
-
-        // Add a tile provider (base map)
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
-
-        let geojsonLayerBrazil;
-        let geojsonLayerParaguay;
 
         // Add Ribeirão Preto permanent pin
         const ribeiraoPretoMarker = L.marker(RIBEIRAO_PRETO_COORDS, {
@@ -280,29 +294,32 @@
             collaboratorMarkers.clearLayers(); // Clear existing pins
             collaboratorLines.clearLayers(); // Clear existing lines
 
-            Object.values(collaborators).flat().forEach(member => {
-                if (member.coords && member.coords.length === 2) {
-                    const marker = L.marker(member.coords, {
-                        icon: L.icon({
-                            iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-                            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                            iconSize: [25, 41],
-                            iconAnchor: [12, 41],
-                            popupAnchor: [1, -34],
-                            shadowSize: [41, 41]
-                        })
-                    }).bindPopup(`<strong>${member.name}</strong><br>Current Location: ${member.origin}`);
-                    collaboratorMarkers.addLayer(marker);
+            // Iterate over all state/country categories in the collaborators object
+            Object.keys(collaborators).forEach(regionKey => {
+                collaborators[regionKey].forEach(member => {
+                    if (member.coords && member.coords.length === 2) {
+                        const marker = L.marker(member.coords, {
+                            icon: L.icon({
+                                iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+                                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                                iconSize: [25, 41],
+                                iconAnchor: [12, 41],
+                                popupAnchor: [1, -34],
+                                shadowSize: [41, 41]
+                            })
+                        }).bindPopup(`<strong>${member.name}</strong><br>Current Location: ${member.origin}<br>Role: ${member.role}`);
+                        collaboratorMarkers.addLayer(marker);
 
-                    // Add dotted line from collaborator to Ribeirão Preto
-                    const line = L.polyline([member.coords, RIBEIRAO_PRETO_COORDS], {
-                        color: 'blue', // Or any color you prefer
-                        weight: 2,
-                        opacity: 0.6,
-                        dashArray: '5, 5' // Dotted line
-                    });
-                    collaboratorLines.addLayer(line);
-                }
+                        // Add dotted line from collaborator to Ribeirão Preto
+                        const line = L.polyline([member.coords, RIBEIRAO_PRETO_COORDS], {
+                            color: 'blue',
+                            weight: 2,
+                            opacity: 0.6,
+                            dashArray: '5, 5'
+                        });
+                        collaboratorLines.addLayer(line);
+                    }
+                });
             });
         }
 
@@ -412,8 +429,6 @@
             locationNameSpan.textContent = regionName;
             collaboratorList.innerHTML = ''; // Clear previous list
 
-            // No need to clear temporary elements here, as they are controlled by the toggle button
-
             const teamMembers = collaborators[regionId];
 
             if (teamMembers && teamMembers.length > 0) {
@@ -425,7 +440,6 @@
                     }
 
                     const listItem = document.createElement('li');
-                    // Removed collaborator-name class as hover effect is no longer needed for pins
                     listItem.innerHTML = `
                         <strong>Name:</strong> ${member.name}<br>
                         <strong>Origin:</strong> ${member.origin}<br>
