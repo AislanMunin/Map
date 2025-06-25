@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mapa de Colaboradores com Leaflet.js</title>
+    <title>Collaborator Map</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
@@ -14,16 +14,50 @@
             flex-direction: column;
             align-items: center;
             margin: 20px;
-            background-color: #f4f4f4;
+            background-color: #f4f4f4; /* Light mode default */
+            color: #333; /* Light mode default text */
+            transition: background-color 0.3s, color 0.3s;
+        }
+        body.dark-mode {
+            background-color: #1a1a2e; /* Dark mode */
+            color: #e0e0e0; /* Dark mode text */
+        }
+        #map-header {
+            width: 80%;
+            max-width: 1000px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: inherit; /* Inherit color for dark mode */
+        }
+        #dark-mode-toggle {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            background-color: #457b9d;
+            color: white;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s;
+        }
+        #dark-mode-toggle:hover {
+            background-color: #1d3557;
         }
         #map {
-            height: 600px; /* Altura do mapa */
+            height: 600px;
             width: 80%;
             max-width: 1000px;
             border: 1px solid #ccc;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
             margin-bottom: 20px;
             background-color: #fff;
+        }
+        body.dark-mode #map {
+            border-color: #555;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
         }
         #info-box {
             width: 80%;
@@ -33,10 +67,16 @@
             box-shadow: 0 0 8px rgba(0,0,0,0.1);
             padding: 15px;
             box-sizing: border-box;
+            transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s;
+        }
+        body.dark-mode #info-box {
+            background-color: #2a2a4a;
+            border-color: #555;
+            box-shadow: 0 0 12px rgba(0,0,0,0.4);
         }
         #info-box h3 {
             margin-top: 0;
-            color: #333;
+            color: inherit;
         }
         #info-box ul {
             list-style: none;
@@ -44,66 +84,124 @@
         }
         #info-box ul li {
             background-color: #f9f9f9;
-            margin-bottom: 5px;
-            padding: 8px 10px;
+            margin-bottom: 8px;
+            padding: 10px 12px;
             border-radius: 4px;
             border-left: 3px solid #457b9d;
+            transition: background-color 0.3s, border-color 0.3s;
+            line-height: 1.4; /* Improves readability */
+        }
+        body.dark-mode #info-box ul li {
+            background-color: #3b3b6b;
+            border-left-color: #7a9d45; /* Dark mode accent color */
+        }
+        #info-box ul li strong {
+            color: #1d3557; /* Light mode accent for labels */
+        }
+        body.dark-mode #info-box ul li strong {
+            color: #a8dadc; /* Dark mode accent for labels */
+        }
+        /* Leaflet map styles for features */
+        .leaflet-pane .leaflet-marker-pane img { /* Adjust marker icon for better visibility if needed */
+            filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.5));
         }
     </style>
 </head>
 <body>
 
-    <h1>Mapa de Colaboradores</h1>
+    <div id="map-header">
+        <h1>Collaborator Map</h1>
+        <button id="dark-mode-toggle">Toggle Dark Mode</button>
+    </div>
 
     <div id="map"></div>
 
     <div id="info-box">
-        <h3>Colaboradores em <span id="location-name"></span></h3>
+        <h3>Collaborators in <span id="location-name"></span></h3>
         <ul id="collaborator-list">
-            <li>Nenhum local selecionado.</li>
+            <li>No location selected.</li>
         </ul>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // Dados dos colaboradores
-        const colaboradores = {
-            "BR-SP": [ // São Paulo
-                { nome: "João Silva", origem: "São Paulo", cargo: "Desenvolvedor Sênior" },
-                { nome: "Maria Souza", origem: "Campinas", cargo: "Analista de Projetos" }
+        // Ribeirão Preto coordinates (Latitude, Longitude)
+        const RIBEIRAO_PRETO_COORDS = [-21.1764, -47.8188];
+
+        // Haversine formula to calculate distance between two points on Earth (in km)
+        function haversineDistance(coords1, coords2) {
+            const R = 6371; // Earth's radius in kilometers
+            const lat1 = coords1[0] * Math.PI / 180;
+            const lon1 = coords1[1] * Math.PI / 180;
+            const lat2 = coords2[0] * Math.PI / 180;
+            const lon2 = coords2[1] * Math.PI / 180;
+
+            const dLat = lat2 - lat1;
+            const dLon = lon2 - lon1;
+
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(lat1) * Math.cos(lat2) *
+                      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+            return R * c; // Distance in kilometers
+        }
+
+        // Collaborator Data (Updated with approximate coordinates for regions/states)
+        // IMPORTANT: The coordinates below are approximate centroids for calculation.
+        // For actual precise distances, you might need more specific data or a geocoding service.
+        const collaborators = {
+            "BR-SP": [ 
+                { name: "João Silva", origin: "São Paulo", role: "Senior Developer", coords: [-23.5505, -46.6333] }, // São Paulo City
+                { name: "Maria Souza", origin: "Campinas", role: "Project Analyst", coords: [-22.9056, -47.0608] } // Campinas City
             ],
-            "BR-RJ": [ // Rio de Janeiro
-                { nome: "Pedro Costa", origem: "Rio de Janeiro", cargo: "Gerente de Vendas" }
+            "BR-RJ": [ 
+                { name: "Pedro Costa", origin: "Rio de Janeiro", role: "Sales Manager", coords: [-22.9068, -43.1729] } // Rio de Janeiro City
             ],
-            "BR-MG": [ // Minas Gerais
-                { nome: "Fernanda Alves", origem: "Belo Horizonte", cargo: "Recursos Humanos" }
+            "BR-MG": [ 
+                { name: "Fernanda Alves", origin: "Belo Horizonte", role: "Human Resources", coords: [-19.9167, -43.9345] } // Belo Horizonte City
             ],
-            "PY": [ // Paraguai como uma única região
-                { nome: "Ana Lopez", origem: "Asunción", cargo: "Especialista em Marketing" },
-                { nome: "Carlos Ramirez", origem: "Ciudad del Este", cargo: "Suporte Técnico" },
-                { nome: "Sofia Guedes", origem: "Luque", cargo: "Coordenadora de Projetos" }
+            "PY": [ // Paraguay as a single region (using Asunción's approximate coordinates for distance)
+                { name: "Ana Lopez", origin: "Asunción", role: "Marketing Specialist", coords: [-25.2637, -57.5759] },
+                { name: "Carlos Ramirez", origin: "Ciudad del Este", role: "Technical Support", coords: [-25.5056, -54.6146] },
+                { name: "Sofia Guedes", origin: "Luque", role: "Project Coordinator", coords: [-25.2667, -57.4917] }
             ]
-            // Adicione mais dados para cada estado brasileiro ou para o Paraguai
-            // Exemplo para um novo estado: "BR-PR": [ { nome: "Novo Colaborador", origem: "Curitiba", cargo: "Desenvolvedor Júnior" } ]
+            // Add more data for each Brazilian state or for Paraguay
         };
 
         const infoBox = document.getElementById('info-box');
         const locationNameSpan = document.getElementById('location-name');
         const collaboratorList = document.getElementById('collaborator-list');
+        const darkModeToggle = document.getElementById('dark-mode-toggle');
 
-        // Inicializa o mapa
+        // Dark Mode Logic
+        const currentTheme = localStorage.getItem('theme');
+        if (currentTheme === 'dark') {
+            document.body.classList.add('dark-mode');
+        }
+
+        darkModeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            if (document.body.classList.contains('dark-mode')) {
+                localStorage.setItem('theme', 'dark');
+            } else {
+                localStorage.setItem('theme', 'light');
+            }
+        });
+
+        // Initialize the map
         const map = L.map('map').setView([-17, -50], 4); 
 
-        // Adiciona um provedor de tiles (mapa base)
+        // Add a tile provider (base map)
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        let geojsonLayerBrasil; 
-        let geojsonLayerParaguai; 
+        let geojsonLayerBrazil; 
+        let geojsonLayerParaguay; 
 
-        // Função para estilizar as regiões
+        // Function to style regions
         function style(feature) {
             return {
                 fillColor: '#a8dadc', 
@@ -115,7 +213,7 @@
             };
         }
 
-        // Função para estilizar ao passar o mouse
+        // Function to style on hover
         function highlightFeature(e) {
             const layer = e.target;
             layer.setStyle({
@@ -131,32 +229,32 @@
             }
         }
 
-        // Função para resetar o estilo
+        // Function to reset style
         function resetHighlight(e) {
-            if (geojsonLayerBrasil && geojsonLayerBrasil.hasLayer(e.target)) {
-                geojsonLayerBrasil.resetStyle(e.target);
-            } else if (geojsonLayerParaguai && geojsonLayerParaguai.hasLayer(e.target)) {
-                geojsonLayerParaguai.resetStyle(e.target);
+            if (geojsonLayerBrazil && geojsonLayerBrazil.hasLayer(e.target)) {
+                geojsonLayerBrazil.resetStyle(e.target);
+            } else if (geojsonLayerParaguay && geojsonLayerParaguay.hasLayer(e.target)) {
+                geojsonLayerParaguay.resetStyle(e.target);
             }
         }
 
-        // Função ao clicar em uma região
+        // Function on region click
         function onEachFeature(feature, layer) {
             let regionId;
             let regionName;
 
-            // Lógica para obter ID e nome da região
-            // Para o GeoJSON do Brasil (codeforamerica/click_that_hood)
+            // Logic to get region ID and name
+            // For Brazil GeoJSON (codeforamerica/click_that_hood)
             if (feature.properties.sigla && feature.properties.name) { 
-                regionId = "BR-" + feature.properties.sigla; // Ex: BR-SP
-                regionName = feature.properties.name; // Ex: São Paulo
+                regionId = "BR-" + feature.properties.sigla; 
+                regionName = feature.properties.name; 
             } 
-            // Para o GeoJSON de países (Paraguai)
+            // For Countries GeoJSON (Paraguay)
             else if (feature.properties.ISO_A2 === "PY" || feature.properties.name === "Paraguay") {
                 regionId = "PY";
-                regionName = "Paraguai";
+                regionName = "Paraguay";
             } else {
-                // Fallback genérico, se nenhuma correspondência for encontrada
+                // Generic fallback if no match is found
                 regionId = feature.properties.name || feature.properties.id || 'unknown';
                 regionName = feature.properties.name || regionId;
             }
@@ -170,7 +268,7 @@
             });
         }
 
-        // Carrega o GeoJSON dos estados do Brasil - NOVO LINK
+        // Load Brazil states GeoJSON - CURRENTLY WORKING LINK
         fetch('https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson')
             .then(response => {
                 if (!response.ok) {
@@ -179,14 +277,14 @@
                 return response.json();
             })
             .then(data => {
-                geojsonLayerBrasil = L.geoJson(data, {
+                geojsonLayerBrazil = L.geoJson(data, {
                     style: style,
                     onEachFeature: onEachFeature
                 }).addTo(map);
             })
-            .catch(error => console.error('Erro ao carregar o GeoJSON do Brasil:', error));
+            .catch(error => console.error('Error loading Brazil GeoJSON:', error));
 
-        // Carrega o GeoJSON de Países (para o Paraguai)
+        // Load Countries GeoJSON (for Paraguay)
         fetch('https://raw.githubusercontent.com/datasets/geo-countries/main/data/countries.geojson')
             .then(response => {
                 if (!response.ok) {
@@ -200,20 +298,20 @@
                 );
                 
                 if (paraguayFeature) {
-                    geojsonLayerParaguai = L.geoJson(paraguayFeature, {
+                    geojsonLayerParaguay = L.geoJson(paraguayFeature, {
                         style: style,
                         onEachFeature: onEachFeature
                     }).addTo(map);
                 } else {
-                    console.warn("Paraguai não encontrado no GeoJSON de países. Verifique as propriedades do GeoJSON.");
+                    console.warn("Paraguay not found in countries GeoJSON. Check GeoJSON properties.");
                 }
 
-                // Ajusta o mapa para a união dos limites de ambos os GeoJSONs
+                // Adjust map to fit the combined bounds of both GeoJSONs
                 let combinedBounds = null;
-                if (geojsonLayerBrasil) {
-                    combinedBounds = geojsonLayerBrasil.getBounds();
+                if (geojsonLayerBrazil) {
+                    combinedBounds = geojsonLayerBrazil.getBounds();
                 }
-                if (geojsonLayerParaguai) {
+                if (geojsonLayerParaguay) {
                     if (combinedBounds) {
                         combinedBounds.extend(geojsonLayerParaguai.getBounds());
                     } else {
@@ -224,30 +322,42 @@
                     map.fitBounds(combinedBounds);
                 }
             })
-            .catch(error => console.error('Erro ao carregar o GeoJSON de Países:', error));
+            .catch(error => console.error('Error loading Countries GeoJSON:', error));
 
 
         function displayCollaborators(regionId, regionName) {
             locationNameSpan.textContent = regionName;
-            collaboratorList.innerHTML = ''; 
+            collaboratorList.innerHTML = ''; // Clear previous list
 
-            const teamMembers = colaboradores[regionId];
+            const teamMembers = collaborators[regionId];
 
             if (teamMembers && teamMembers.length > 0) {
                 teamMembers.forEach(member => {
+                    // Calculate distance if coordinates are available
+                    let distance = 'N/A';
+                    if (member.coords && member.coords.length === 2) {
+                        const distKm = haversineDistance(member.coords, RIBEIRAO_PRETO_COORDS);
+                        distance = `${distKm.toFixed(2)} km`;
+                    }
+
                     const listItem = document.createElement('li');
-                    listItem.textContent = `${member.nome}, ${member.origem}, ${member.cargo}`;
+                    listItem.innerHTML = `
+                        <strong>Name:</strong> ${member.name}<br>
+                        <strong>Origin:</strong> ${member.origin}<br>
+                        <strong>Role:</strong> ${member.role}<br>
+                        <strong>Distance to Ribeirão Preto:</strong> ${distance}
+                    `;
                     collaboratorList.appendChild(listItem);
                 });
             } else {
                 const listItem = document.createElement('li');
-                listItem.textContent = 'Nenhum colaborador encontrado para esta região.';
+                listItem.textContent = 'No collaborators found for this region.';
                 collaboratorList.appendChild(listItem);
             }
         }
 
-        // Inicializa a caixa de informações
-        displayCollaborators(null, 'Nenhum local selecionado.');
+        // Initialize info box
+        displayCollaborators(null, 'No location selected.');
     </script>
 
 </body>
