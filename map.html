@@ -110,7 +110,7 @@
         .collaborator-name {
             cursor: pointer;
             font-weight: bold;
-            color: #007bff; /* Link color */
+            color: #007bff;
             text-decoration: none;
         }
         .collaborator-name:hover {
@@ -140,56 +140,58 @@
     <script>
         // Ribeirão Preto coordinates (Latitude, Longitude)
         const RIBEIRAO_PRETO_COORDS = [-21.1764, -47.8188];
-        const SAO_PAULO_CITY_COORDS = [-23.5505, -46.6333]; // Approximate coordinates for São Paulo
+        // São Paulo (State) ID for highlighting
+        const SAO_PAULO_STATE_ID = "BR-SP";
 
         // Haversine formula to calculate distance between two points on Earth (in km)
         function haversineDistance(coords1, coords2) {
-            const R = 6371; // Earth's radius in kilometers
-            const lat1 = coords1 && coords1.length === 2 ? coords1 : [0, 0];
-            const lon1 = coords1 && coords1.length === 2 ? coords1 : [0, 0];
-            const lat2 = coords2 && coords2.length === 2 ? coords2 : [0, 0];
-            const lon2 = coords2 && coords2.length === 2 ? coords2 : [0, 0];
+            if (!coords1 || coords1.length !== 2 || !coords2 || coords2.length !== 2) {
+                return NaN; // Return NaN if coordinates are invalid
+            }
 
-            const dLat = (lat2 && lat1) ? (lat2 * Math.PI / 180) - (lat1 * Math.PI / 180) : 0;
-            const dLon = (lon2 && lon1) ? (lon2 * Math.PI / 180) - (lon1 * Math.PI / 180) : 0;
-            const la1 = (lat1 && lat1.length === 2) ? lat1 : [0, 0];
-            const lo1 = (lon1 && lon1.length === 2) ? lon1 : [0, 0];
-            const la2 = (lat2 && lat2.length === 2) ? lat2 : [0, 0];
-            const lo2 = (lon2 && lon2.length === 2) ? lon2 : [0, 0];
+            const R = 6371; // Earth's radius in kilometers
+            const lat1 = coords1[0] * Math.PI / 180;
+            const lon1 = coords1[1] * Math.PI / 180;
+            const lat2 = coords2[0] * Math.PI / 180;
+            const lon2 = coords2[1] * Math.PI / 180;
+
+            const dLat = lat2 - lat1;
+            const dLon = lon2 - lon1;
 
             const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                      Math.cos((la1 && la1.length === 2 ? la1 : [0,0])[0] * Math.PI / 180) * Math.cos((la2 && la2.length === 2 ? la2 : [0,0])[0] * Math.PI / 180) *
+                      Math.cos(lat1) * Math.cos(lat2) *
                       Math.sin(dLon / 2) * Math.sin(dLon / 2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
             return R * c; // Distance in kilometers
         }
 
-        // Collaborator Data (Updated with approximate coordinates for regions/states)
+        // Collaborator Data (Updated with approximate coordinates for origins)
+        // IMPORTANT: Ensure 'origin' matches the 'name' property of Brazilian states GeoJSON
+        // and 'Paraguay' for the country. Add 'coords' for distance calculation.
         const collaborators = {
             "BR-SP": [
-                { name: "João Silva", origin: "São Paulo", role: "Senior Developer", coords: [-23.5505, -46.6333] },
-                { name: "Maria Souza", origin: "Campinas", role: "Project Analyst", coords: [-22.9056, -47.0608] }
+                { name: "João Silva", origin: "São Paulo", role: "Senior Developer", coords: [-23.5505, -46.6333] }, // São Paulo City
+                { name: "Maria Souza", origin: "Campinas", role: "Project Analyst", coords: [-22.9056, -47.0608] }, // Campinas City
+                { name: "Aislan Munin", origin: "Bahia", role: "Content Editor", coords: [-12.9667, -38.5000] } // Approximate Salvador, Bahia
             ],
             "BR-RJ": [
-                { name: "Pedro Costa", origin: "Rio de Janeiro", role: "Sales Manager", coords: [-22.9068, -43.1729] }
+                { name: "Pedro Costa", origin: "Rio de Janeiro", role: "Sales Manager", coords: [-22.9068, -43.1729] } // Rio de Janeiro City
             ],
             "BR-MG": [
-                { name: "Fernanda Alves", origin: "Belo Horizonte", role: "Human Resources", coords: [-19.9167, -43.9345] }
+                { name: "Fernanda Alves", origin: "Minas Gerais", role: "Human Resources", coords: [-19.9167, -43.9345] } // Belo Horizonte, Minas Gerais
             ],
             "PY": [
-                { name: "Ana Lopez", origin: "Asunción", role: "Marketing Specialist", coords: [-25.2637, -57.5759] },
-                { name: "Carlos Ramirez", origin: "Ciudad del Este", role: "Technical Support", coords: [-25.5056, -54.6146] },
-                { name: "Sofia Guedes", origin: "Luque", role: "Project Coordinator", coords: [-25.2667, -57.4917] }
+                { name: "Ana Lopez", origin: "Paraguay", role: "Marketing Specialist", coords: [-25.2637, -57.5759] }, // Asunción, Paraguay
+                { name: "Carlos Ramirez", origin: "Paraguay", role: "Technical Support", coords: [-25.5056, -54.6146] }, // Ciudad del Este, Paraguay
+                { name: "Sofia Guedes", origin: "Paraguay", role: "Project Coordinator", coords: [-25.2667, -57.4917] } // Luque, Paraguay
             ]
-            // Add more data with 'coords' for each origin
         };
 
         const infoBox = document.getElementById('info-box');
         const locationNameSpan = document.getElementById('location-name');
         const collaboratorList = document.getElementById('collaborator-list');
         const darkModeToggle = document.getElementById('dark-mode-toggle');
-        const mapElement = document.getElementById('map');
 
         // Dark Mode Logic (same as before)
         const currentTheme = localStorage.getItem('theme');
@@ -218,29 +220,50 @@
         let geojsonLayerParaguay;
         let highlightedLayers = []; // Array to store currently highlighted layers
 
+        // Default style for regions
+        const defaultStyle = {
+            fillColor: '#a8dadc',
+            weight: 1,
+            opacity: 1,
+            color: '#457b9d',
+            dashArray: '3',
+            fillOpacity: 0.7
+        };
+
+        // Highlight style for regions
+        const hoverStyle = {
+            weight: 3,
+            color: '#666',
+            dashArray: '',
+            fillOpacity: 0.9,
+            fillColor: '#1d3557'
+        };
+
+        // Origin highlight style (red border, specific fill)
+        const originHighlightStyle = {
+            weight: 4,
+            color: '#ff0000', // Red border
+            fillOpacity: 0.9,
+            fillColor: '#ffd700' // Gold fill for origin
+        };
+
+        // Current location (São Paulo) highlight style (blue border, specific fill)
+        const currentLocationHighlightStyle = {
+            weight: 4,
+            color: '#0000ff', // Blue border
+            fillOpacity: 0.9,
+            fillColor: '#87CEEB' // SkyBlue fill for current location
+        };
+
         // Function to style regions
-        function style(feature) {
-            return {
-                fillColor: '#a8dadc',
-                weight: 1,
-                opacity: 1,
-                color: '#457b9d',
-                dashArray: '3',
-                fillOpacity: 0.7
-            };
+        function styleFeature(feature) {
+            return defaultStyle;
         }
 
         // Function to style on hover for regions
         function highlightFeature(e) {
             const layer = e.target;
-            layer.setStyle({
-                weight: 3,
-                color: '#666',
-                dashArray: '',
-                fillOpacity: 0.9,
-                fillColor: '#1d3557'
-            });
-
+            layer.setStyle(hoverStyle);
             if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
                 layer.bringToFront();
             }
@@ -255,24 +278,26 @@
             }
         }
 
-        // Function to highlight a specific GeoJSON feature by property
-        function highlightGeoJSONFeature(layer, property, value) {
-            if (layer) {
-                layer.eachLayer(function (featureLayer) {
-                    if (featureLayer.feature.properties.sigla === value || featureLayer.feature.properties.name === value || featureLayer.feature.properties.ISO_A2 === value) {
-                        featureLayer.setStyle({
-                            weight: 4,
-                            color: '#ff0000', // Highlight color
-                            fillOpacity: 0.9
-                        });
-                        highlightedLayers.push(featureLayer);
-                    }
-                });
-            }
+        // Function to highlight a specific GeoJSON feature by property and apply a style
+        function highlightGeoJSONFeature(layerGroup, property, value, highlightStyle) {
+            if (!layerGroup) return;
+
+            layerGroup.eachLayer(function (featureLayer) {
+                // Brazil states have 'name' and 'sigla'
+                if (layerGroup === geojsonLayerBrazil && (featureLayer.feature.properties.name === value || featureLayer.feature.properties.sigla === value.replace('BR-', ''))) {
+                    featureLayer.setStyle(highlightStyle);
+                    highlightedLayers.push(featureLayer);
+                }
+                // Countries GeoJSON has 'name' and 'ISO_A2'
+                else if (layerGroup === geojsonLayerParaguay && (featureLayer.feature.properties.name === value || featureLayer.feature.properties.ISO_A2 === value)) {
+                    featureLayer.setStyle(highlightStyle);
+                    highlightedLayers.push(featureLayer);
+                }
+            });
         }
 
-        // Function to reset highlighted GeoJSON features
-        function resetHighlightedFeatures() {
+        // Function to reset all currently highlighted GeoJSON features
+        function resetAllHighlights() {
             highlightedLayers.forEach(layer => {
                 if (geojsonLayerBrazil && geojsonLayerBrazil.hasLayer(layer)) {
                     geojsonLayerBrazil.resetStyle(layer);
@@ -289,17 +314,13 @@
             let regionName;
 
             // Logic to get region ID and name
-            // For Brazil GeoJSON (codeforamerica/click_that_hood)
             if (feature.properties.sigla && feature.properties.name) {
                 regionId = "BR-" + feature.properties.sigla;
                 regionName = feature.properties.name;
-            }
-            // For Countries GeoJSON (Paraguay)
-            else if (feature.properties.ISO_A2 === "PY" || feature.properties.name === "Paraguay") {
+            } else if (feature.properties.ISO_A2 === "PY" || feature.properties.name === "Paraguay") {
                 regionId = "PY";
                 regionName = "Paraguay";
             } else {
-                // Generic fallback if no match is found
                 regionId = feature.properties.name || feature.properties.id || 'unknown';
                 regionName = feature.properties.name || regionId;
             }
@@ -323,7 +344,7 @@
             })
             .then(data => {
                 geojsonLayerBrazil = L.geoJson(data, {
-                    style: style,
+                    style: styleFeature,
                     onEachFeature: onEachFeature
                 }).addTo(map);
             })
@@ -344,7 +365,7 @@
 
                 if (paraguayFeature) {
                     geojsonLayerParaguay = L.geoJson(paraguayFeature, {
-                        style: style,
+                        style: styleFeature,
                         onEachFeature: onEachFeature
                     }).addTo(map);
                 } else {
@@ -360,7 +381,7 @@
                     if (combinedBounds) {
                         combinedBounds.extend(geojsonLayerParaguay.getBounds());
                     } else {
-                        combinedBounds = geojsonLayerParaguay.getBounds();
+                        combinedBounds = geojsonLayerParaguai.getBounds();
                     }
                 }
                 if (combinedBounds) {
@@ -373,23 +394,21 @@
         function displayCollaborators(regionId, regionName) {
             locationNameSpan.textContent = regionName;
             collaboratorList.innerHTML = ''; // Clear previous list
-            resetHighlightedFeatures(); // Reset any previous highlights
+            resetAllHighlights(); // Reset any previous highlights
 
-            const teamMembers = collaborators.hasOwnProperty(regionId) ? collaborators_with_coords : (collaborators_with_coords["PY"] ? { "PY": collaborators_with_coords["PY"] } : {});
-            const currentRegionMembers = teamMembers.hasOwnProperty(regionId) ? teamMembers?.[regionId] : [];
+            const teamMembers = collaborators[regionId];
 
-            if (currentRegionMembers && currentRegionMembers.length > 0) {
-                currentRegionMembers.forEach(member => {
-                    // Calculate distance if coordinates are available
+            if (teamMembers && teamMembers.length > 0) {
+                teamMembers.forEach(member => {
                     let distance = 'N/A';
                     if (member.coords && member.coords.length === 2) {
                         const distKm = haversineDistance(member.coords, RIBEIRAO_PRETO_COORDS);
-                        distance = `${distKm.toFixed(2)} km`;
+                        distance = !isNaN(distKm) ? `${distKm.toFixed(2)} km` : 'N/A';
                     }
 
                     const listItem = document.createElement('li');
                     listItem.innerHTML = `
-                        <strong>Name:</strong> <a href="#" class="collaborator-name" data-origin="${member.origin}">${member.name}</a><br>
+                        <strong>Name:</strong> <a href="#" class="collaborator-name" data-origin="${member.origin}" data-member-coords="${member.coords}">${member.name}</a><br>
                         <strong>Origin:</strong> ${member.origin}<br>
                         <strong>Role:</strong> ${member.role}<br>
                         <strong>Distance to Ribeirão Preto:</strong> ${distance}
@@ -401,15 +420,32 @@
                 const collaboratorNameLinks = document.querySelectorAll('.collaborator-name');
                 collaboratorNameLinks.forEach(link => {
                     link.addEventListener('mouseover', function(e) {
+                        e.preventDefault(); // Prevent default link behavior
                         const origin = this.dataset.origin;
-                        resetHighlightedFeatures();
-                        highlightGeoJSONFeature(geojsonLayerBrazil, 'name', origin);
-                        highlightGeoJSONFeature(geojsonLayerParaguay, 'name', origin);
-                        highlightGeoJSONFeature(geojsonLayerBrazil, 'sigla', origin.split('-')[1]); // Try highlighting by SIGLA
-                        highlightGeoJSONFeature(geojsonLayerBrazil, 'name', 'São Paulo'); // Highlight São Paulo (current location)
-                        highlightGeoJSONFeature(geojsonLayerBrazil, 'sigla', 'SP'); // Highlight São Paulo by SIGLA
+                        const memberCoords = this.dataset.memberCoords ? this.dataset.memberCoords.split(',').map(Number) : null;
+
+                        resetAllHighlights(); // Clear all highlights first
+
+                        // Highlight Origin
+                        if (origin === "Paraguay") {
+                            highlightGeoJSONFeature(geojsonLayerParaguay, 'name', 'Paraguay', originHighlightStyle);
+                        } else {
+                            highlightGeoJSONFeature(geojsonLayerBrazil, 'name', origin, originHighlightStyle);
+                        }
+
+                        // Highlight São Paulo (Current Location)
+                        highlightGeoJSONFeature(geojsonLayerBrazil, 'sigla', 'SP', currentLocationHighlightStyle);
+
+
+                        // Optional: Add a temporary marker for the specific collaborator's origin city
+                        // This requires the 'coords' in collaborators to be the city's coordinates, not the state's.
+                        // if (memberCoords) {
+                        //     const marker = L.marker(memberCoords).addTo(map);
+                        //     highlightedLayers.push(marker); // Add marker to highlighted list to remove later
+                        // }
                     });
-                    link.addEventListener('mouseout', resetHighlightedFeatures);
+
+                    link.addEventListener('mouseout', resetAllHighlights);
                 });
 
             } else {
@@ -418,26 +454,6 @@
                 collaboratorList.appendChild(listItem);
             }
         }
-
-        // Updated collaborator data with coordinates
-        const collaborators_with_coords = {
-            "BR-SP": [
-                { name: "João Silva", origin: "São Paulo", role: "Senior Developer", coords: [-23.5505, -46.6333] },
-                { name: "Maria Souza", origin: "Campinas", role: "Project Analyst", coords: [-22.9056, -47.0608] },
-                { name: "Aislan Munin", origin: "Bahia", role: "Content Editor", coords: [-12.9667, -38.5000] } // Approximate Bahia coordinates
-            ],
-            "BR-RJ": [
-                { name: "Pedro Costa", origin: "Rio de Janeiro", role: "Sales Manager", coords: [-22.9068, -43.1729] }
-            ],
-            "BR-MG": [
-                { name: "Fernanda Alves", origin: "Belo Horizonte", role: "Human Resources", coords: [-19.9167, -43.9345] }
-            ],
-            "PY": [
-                { name: "Ana Lopez", origin: "Asunción", role: "Marketing Specialist", coords: [-25.2637, -57.5759] },
-                { name: "Carlos Ramirez", origin: "Ciudad del Este", role: "Technical Support", coords: [-25.5056, -54.6146] },
-                { name: "Sofia Guedes", origin: "Luque", role: "Project Coordinator", coords: [-25.2667, -57.4917] }
-            ]
-        };
 
         // Initialize info box
         displayCollaborators(null, 'No location selected.');
