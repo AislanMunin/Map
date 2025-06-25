@@ -83,8 +83,9 @@
                 { nome: "Ana Lopez", origem: "Asunción", cargo: "Especialista em Marketing" },
                 { nome: "Carlos Ramirez", origem: "Ciudad del Este", cargo: "Suporte Técnico" },
                 { nome: "Sofia Guedes", origem: "Luque", cargo: "Coordenadora de Projetos" }
-            ]
+            ],
             // Adicione mais dados para cada estado brasileiro ou para o Paraguai
+            // Exemplo para um novo estado: "BR-PR": [ { nome: "Novo Colaborador", origem: "Curitiba", cargo: "Desenvolvedor Júnior" } ]
         };
 
         const infoBox = document.getElementById('info-box');
@@ -92,23 +93,24 @@
         const collaboratorList = document.getElementById('collaborator-list');
 
         // Inicializa o mapa
-        const map = L.map('map').setView([-20, -55], 4); // Centro mais geral na América do Sul, zoom 4
+        // Centrando mais na América do Sul e com zoom adequado
+        const map = L.map('map').setView([-17, -50], 4); 
 
         // Adiciona um provedor de tiles (mapa base)
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        let geojsonLayerBrasil; // Variável para a camada GeoJSON do Brasil
-        let geojsonLayerParaguai; // Variável para a camada GeoJSON do Paraguai
+        let geojsonLayerBrasil; 
+        let geojsonLayerParaguai; 
 
         // Função para estilizar as regiões
         function style(feature) {
             return {
-                fillColor: '#a8dadc', // Cor padrão
+                fillColor: '#a8dadc', 
                 weight: 1,
                 opacity: 1,
-                color: '#457b9d', // Cor da borda
+                color: '#457b9d', 
                 dashArray: '3',
                 fillOpacity: 0.7
             };
@@ -122,7 +124,7 @@
                 color: '#666',
                 dashArray: '',
                 fillOpacity: 0.9,
-                fillColor: '#1d3557' // Cor ao passar o mouse
+                fillColor: '#1d3557' 
             });
 
             if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
@@ -132,7 +134,6 @@
 
         // Função para resetar o estilo
         function resetHighlight(e) {
-            // Verifica qual camada resetar (Brasil ou Paraguai)
             if (geojsonLayerBrasil && geojsonLayerBrasil.hasLayer(e.target)) {
                 geojsonLayerBrasil.resetStyle(e.target);
             } else if (geojsonLayerParaguai && geojsonLayerParaguai.hasLayer(e.target)) {
@@ -146,16 +147,28 @@
             let regionName;
 
             // Lógica para obter ID e nome da região
-            if (feature.properties.ID_UF || feature.properties.SIGLA_UF || feature.properties.codarea) {
-                // Para estados do Brasil
-                regionId = feature.properties.ID_UF || feature.properties.SIGLA_UF || feature.properties.codarea;
-                regionName = feature.properties.nome || feature.properties.name || regionId;
-            } else if (feature.properties.iso_a2 === "PY") {
-                // Para o Paraguai como país único
+            // Para o GeoJSON do IBGE (Brasil)
+            if (feature.properties.id) { // ID do estado, ex: 35 para SP
+                const idUf = feature.properties.id;
+                // Mapear ID do IBGE para SIGLA_UF (se necessário, para bater com seus dados)
+                // Exemplo simplificado, você pode precisar de um mapa mais completo
+                const ufMap = {
+                    11: 'BR-RO', 12: 'BR-AC', 13: 'BR-AM', 14: 'BR-RR', 15: 'BR-PA',
+                    16: 'BR-AP', 17: 'BR-TO', 21: 'BR-MA', 22: 'BR-PI', 23: 'BR-CE',
+                    24: 'BR-RN', 25: 'BR-PB', 26: 'BR-PE', 27: 'BR-AL', 28: 'BR-SE',
+                    29: 'BR-BA', 31: 'BR-MG', 32: 'BR-ES', 33: 'BR-RJ', 35: 'BR-SP',
+                    41: 'BR-PR', 42: 'BR-SC', 43: 'BR-RS', 50: 'BR-MS', 51: 'BR-MT',
+                    52: 'BR-GO', 53: 'BR-DF'
+                };
+                regionId = ufMap[idUf] || 'BR-UF' + idUf; // Usar o ID mapeado ou um genérico
+                regionName = feature.properties.nome; // Nome do estado
+            } 
+            // Para o GeoJSON de países (Paraguai)
+            else if (feature.properties.ISO_A2 === "PY" || feature.properties.name === "Paraguay") {
                 regionId = "PY";
                 regionName = "Paraguai";
             } else {
-                // Fallback genérico se o GeoJSON tiver outras propriedades
+                // Fallback genérico, se nenhuma correspondência for encontrada
                 regionId = feature.properties.name || feature.properties.id || 'unknown';
                 regionName = feature.properties.name || regionId;
             }
@@ -169,8 +182,8 @@
             });
         }
 
-        // Carrega o GeoJSON dos estados do Brasil
-        fetch('https://raw.githubusercontent.com/fititnt/brazilian-states-and-cities/master/states.json')
+        // Carrega o GeoJSON dos estados do Brasil - NOVO LINK
+        fetch('https://raw.githubusercontent.com/ibge/Admin-Boundary/master/BR_UF.json')
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -185,7 +198,7 @@
             })
             .catch(error => console.error('Erro ao carregar o GeoJSON do Brasil:', error));
 
-        // Carrega o GeoJSON do Paraguai (como país único)
+        // Carrega o GeoJSON de Países (para o Paraguai) - LINK ATUALIZADO/CONFIRMADO
         fetch('https://raw.githubusercontent.com/datasets/geo-countries/main/data/countries.geojson')
             .then(response => {
                 if (!response.ok) {
@@ -194,14 +207,18 @@
                 return response.json();
             })
             .then(data => {
-                const paraguayFeature = data.features.find(feature => feature.properties.ISO_A2 === "PY");
+                // Procurar Paraguai por ISO_A2 ou nome
+                const paraguayFeature = data.features.find(feature => 
+                    feature.properties.ISO_A2 === "PY" || feature.properties.name === "Paraguay"
+                );
+                
                 if (paraguayFeature) {
                     geojsonLayerParaguai = L.geoJson(paraguayFeature, {
                         style: style,
                         onEachFeature: onEachFeature
                     }).addTo(map);
                 } else {
-                    console.warn("Paraguai não encontrado no GeoJSON de países.");
+                    console.warn("Paraguai não encontrado no GeoJSON de países. Verifique as propriedades do GeoJSON.");
                 }
 
                 // Ajusta o mapa para a união dos limites de ambos os GeoJSONs
@@ -220,12 +237,12 @@
                     map.fitBounds(combinedBounds);
                 }
             })
-            .catch(error => console.error('Erro ao carregar o GeoJSON do Paraguai:', error));
+            .catch(error => console.error('Erro ao carregar o GeoJSON de Países:', error));
 
 
         function displayCollaborators(regionId, regionName) {
             locationNameSpan.textContent = regionName;
-            collaboratorList.innerHTML = ''; // Limpa a lista anterior
+            collaboratorList.innerHTML = ''; 
 
             const teamMembers = colaboradores[regionId];
 
